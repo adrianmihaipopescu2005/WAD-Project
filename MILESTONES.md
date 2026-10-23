@@ -6,7 +6,7 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M0: Project setup.** Git repo, `CLAUDE.md`, ADRs (stack, domain mapping), subagents adapted to Flask + Bootstrap, this plan.
 - [x] **M1: Flask skeleton.** App factory, config, SQLite + models (`User`, `Student`, `Absence`) with FKs/CHECKs, `init-db` command that creates the admin, Bootstrap `base.html`, pytest setup.
 - [x] **M2: Authentication.** Login/logout page, `admin`/`assistant` roles, role-required decorators, CSRF.
-- [ ] **M3: Assistant management (admin).** Add and remove lab assistants.
+- [x] **M3: Assistant management (admin).** Add and remove lab assistants. Removing one reassigns their students.
 - [ ] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
 - [ ] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
 - [ ] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
@@ -14,10 +14,22 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [ ] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
 ## Open questions
-- M3: what happens to an assistant's students when the admin removes that assistant? (For now the DB blocks the delete with `ON DELETE RESTRICT`.)
 - M6: how does a public-form submission find its assistant? (See `adr/shared/shared-domain-mapping.md`.)
 
 ## Log
+### M3: Assistant management (2026-10-23)
+- `services/assistants.py`:
+  - `list_assistants` (with student counts) and `create_assistant` (case-insensitive duplicate-email check).
+  - `remove_assistant`: moves the students (and so their absences) to another assistant and deletes the assistant in **one transaction**, rolling back on any error.
+- `admin` blueprint (admin only):
+  - `GET /admin/assistants`: table plus empty state.
+  - `GET/POST /admin/assistants/new`: name, email, temporary password of at least 8 characters.
+  - `POST /admin/assistants/<id>/delete`: optional `reassign_to`, which is required when the assistant has students.
+- Rules: the target must be a different assistant (not self, not an admin, and it must exist). Removing an admin or a missing id gives 404. With students and no other assistant, the Remove button is disabled.
+- UI: a Bootstrap confirmation modal per assistant, with a select listing only the other assistants. Navbar "Assistants" link for admins only. The form macro shows help text (`aria-describedby`).
+- Fixed: Jinja macro `kwargs` reassignment broke keyword args (now `attrs`).
+- Tests: `test_admin.py` (26 tests, including an atomicity test with a simulated failure after the UPDATE). **67 passed** in total, ruff clean. Also checked end to end with CSRF on.
+
 ### M2: Authentication (2026-10-23)
 - `auth` blueprint:
   - `GET/POST /login`: Flask-WTF form, CSRF, "remember me", case-insensitive email, the same error for a wrong email or a wrong password.

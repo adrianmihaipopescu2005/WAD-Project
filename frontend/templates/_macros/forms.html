@@ -9,8 +9,14 @@
   {% else %}
     <div class="mb-3">
       {{ field.label(class="form-label" ~ ("" if label_visible else " visually-hidden")) }}
-      {{ field(class="form-control" ~ (" is-invalid" if field.errors else ""), **kwargs) }}
+      {# Don't reassign `kwargs`: Jinja then stops accepting keyword arguments for the macro. #}
+      {% set attrs = dict(kwargs, **{"aria-describedby": field.id ~ "-help"})
+                     if field.description else kwargs %}
+      {{ field(class="form-control" ~ (" is-invalid" if field.errors else ""), **attrs) }}
       {% for error in field.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+      {% if field.description %}
+        <div id="{{ field.id }}-help" class="form-text">{{ field.description }}</div>
+      {% endif %}
     </div>
   {% endif %}
 {% endmacro %}

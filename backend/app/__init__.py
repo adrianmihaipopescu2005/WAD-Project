@@ -31,6 +31,7 @@ def create_app(config_class=Config):
     login_manager.login_message = "Please log in to access this page."
     login_manager.login_message_category = "warning"
 
+    from .blueprints.admin.routes import bp as admin_bp
     from .blueprints.auth.forms import LogoutForm
     from .blueprints.auth.routes import bp as auth_bp
     from .blueprints.dashboard.routes import bp as dashboard_bp
@@ -39,6 +40,7 @@ def create_app(config_class=Config):
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(admin_bp)
 
     # The navbar's logout button is a POST form on every page.
     app.context_processor(lambda: {"logout_form": LogoutForm()})
