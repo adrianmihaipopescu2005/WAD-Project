@@ -1,0 +1,16 @@
+{# Renders a WTForms field with a Bootstrap 5 label and validation feedback. #}
+{% macro render_field(field, label_visible=true) %}
+  {% if field.type == "BooleanField" %}
+    <div class="form-check mb-3">
+      {{ field(class="form-check-input" ~ (" is-invalid" if field.errors else "")) }}
+      {{ field.label(class="form-check-label") }}
+      {% for error in field.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+    </div>
+  {% else %}
+    <div class="mb-3">
+      {{ field.label(class="form-label" ~ ("" if label_visible else " visually-hidden")) }}
+      {{ field(class="form-control" ~ (" is-invalid" if field.errors else ""), **kwargs) }}
+      {% for error in field.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}

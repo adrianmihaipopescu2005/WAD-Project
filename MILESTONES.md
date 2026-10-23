@@ -5,7 +5,7 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 ## Plan
 - [x] **M0: Project setup.** Git repo, `CLAUDE.md`, ADRs (stack, domain mapping), subagents adapted to Flask + Bootstrap, this plan.
 - [x] **M1: Flask skeleton.** App factory, config, SQLite + models (`User`, `Student`, `Absence`) with FKs/CHECKs, `init-db` command that creates the admin, Bootstrap `base.html`, pytest setup.
-- [ ] **M2: Authentication.** Login/logout page, `admin`/`assistant` roles, role-required decorators, CSRF.
+- [x] **M2: Authentication.** Login/logout page, `admin`/`assistant` roles, role-required decorators, CSRF.
 - [ ] **M3: Assistant management (admin).** Add and remove lab assistants.
 - [ ] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
 - [ ] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
@@ -18,6 +18,18 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - M6: how does a public-form submission find its assistant? (See `adr/shared/shared-domain-mapping.md`.)
 
 ## Log
+### M2: Authentication (2026-10-23)
+- `auth` blueprint:
+  - `GET/POST /login`: Flask-WTF form, CSRF, "remember me", case-insensitive email, the same error for a wrong email or a wrong password.
+  - `POST /logout`: CSRF-protected, so a GET returns 405.
+- Safe `?next=` redirect after login. It rejects absolute URLs, `//host` and backslash tricks; the backslash case was found by a test and fixed.
+- `decorators.py`: `role_required(*roles)` and `admin_required`. Anonymous users are sent to login, and logged-in users with the wrong role get 403.
+- `dashboard` blueprint `/dashboard/`: stat cards scoped per role. An assistant sees their own students and active absences. An admin sees everything, plus the assistant count.
+- 403/404 error pages. Navbar shows Dashboard, the user name and role badge and a Log out button (POST form) when logged in, and Staff login otherwise.
+- `_macros/forms.html` `render_field` (Bootstrap labels plus `is-invalid`/`invalid-feedback`).
+- Session cookies are HttpOnly with SameSite=Lax. `init-db` normalizes the admin email.
+- Tests: `test_auth.py` (22 tests, including CSRF on and off). **41 passed** in total, ruff clean. Also checked end to end with CSRF on.
+
 ### M1: Flask skeleton (2026-10-23)
 - `backend/requirements.txt` (pinned) and `pyproject.toml` (pytest + ruff config).
 - App factory `create_app()` that serves templates/static from `frontend/`. The DB defaults to `backend/instance/app.db`.

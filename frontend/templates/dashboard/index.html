@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Dashboard</h1>
+
+<div class="row g-3">
+  {% if current_user.is_admin %}
+    <div class="col-sm-6 col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="text-body-secondary small">Lab assistants</div>
+          <div class="fs-2 fw-semibold" data-stat="assistants">{{ stats.assistants }}</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-body-secondary small">
+          {{ "Students" if current_user.is_admin else "My students" }}
+        </div>
+        <div class="fs-2 fw-semibold" data-stat="students">{{ stats.students }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="text-body-secondary small">Active absences</div>
+        <div class="fs-2 fw-semibold" data-stat="active_absences">{{ stats.active_absences }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

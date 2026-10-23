@@ -21,13 +21,25 @@
       </button>
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav me-auto">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if request.endpoint == 'dashboard.index' }}"
+                 href="{{ url_for('dashboard.index') }}">Dashboard</a>
+            </li>
+          {% endif %}
           {% block nav_items %}{% endblock %}
         </ul>
         {% if current_user.is_authenticated %}
-          <span class="navbar-text">
+          <span class="navbar-text me-3">
             {{ current_user.name }}
             <span class="badge text-bg-light ms-1">{{ current_user.role }}</span>
           </span>
+          <form method="post" action="{{ url_for('auth.logout') }}" class="d-flex">
+            {{ logout_form.hidden_tag() }}
+            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+          </form>
+        {% else %}
+          <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.login') }}">Staff login</a>
         {% endif %}
       </div>
     </div>

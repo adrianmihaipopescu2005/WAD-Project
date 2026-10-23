@@ -1,11 +1,12 @@
 from pathlib import Path
 
 import click
-from flask import Flask
+from flask import Flask, render_template
 
 from .config import Config
 from .extensions import csrf, db, login_manager
 from .models import ROLE_ADMIN, User
+from .services.auth import normalize_email
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
@@ -27,13 +28,31 @@ def create_app(config_class=Config):
     csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+    login_manager.login_message = "Please log in to access this page."
+    login_manager.login_message_category = "warning"
 
+    from .blueprints.auth.forms import LogoutForm
+    from .blueprints.auth.routes import bp as auth_bp
+    from .blueprints.dashboard.routes import bp as dashboard_bp
     from .blueprints.main.routes import bp as main_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(dashboard_bp)
 
+    # The navbar's logout button is a POST form on every page.
+    app.context_processor(lambda: {"logout_form": LogoutForm()})
+
+    _register_error_handlers(app)
     _register_cli(app)
     return app
+
+
+def _register_error_handlers(app):
+    for code in (403, 404):
+        app.register_error_handler(
+            code, lambda e, code=code: (render_template(f"errors/{code}.html"), code)
+        )
 
 
 @login_manager.user_loader
@@ -49,6 +68,7 @@ def _register_cli(app):
     def init_db(email, name, password):
         """Create the tables and the admin account (skipped if the email already exists)."""
         db.create_all()
+        email = normalize_email(email)
         if db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none():
             click.echo(f"User {email} already exists, tables are ready.")
             return

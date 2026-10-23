@@ -35,6 +35,11 @@ def _make_user(email, role):
 
 
 @pytest.fixture
+def make_user(app):
+    return _make_user
+
+
+@pytest.fixture
 def admin(app):
     return _make_user("prof@example.com", ROLE_ADMIN)
 
@@ -42,3 +47,7 @@ def admin(app):
 @pytest.fixture
 def assistant(app):
     return _make_user("assistant@example.com", ROLE_ASSISTANT)
+
+
+def login(client, email, password="secret123", **query):
+    return client.post("/login", query_string=query, data={"email": email, "password": password})

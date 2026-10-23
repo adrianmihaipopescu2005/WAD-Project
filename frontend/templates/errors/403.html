@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Access denied · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<h1 class="h3">Access denied</h1>
+<p>You don't have permission to view this page.</p>
+<a class="btn btn-outline-primary" href="{{ url_for('main.index') }}">Back to home</a>
+{% endblock %}

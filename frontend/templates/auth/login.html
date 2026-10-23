@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros/forms.html" import render_field %}
+
+{% block title %}Log in · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-10 col-md-6 col-lg-4">
+    <h1 class="h3 mb-3">Staff login</h1>
+    <p class="text-body-secondary small">For the professor and lab assistants.</p>
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ render_field(form.email, autocomplete="username", autofocus=true) }}
+      {{ render_field(form.password, autocomplete="current-password") }}
+      {{ render_field(form.remember) }}
+      {{ form.submit(class="btn btn-primary w-100") }}
+    </form>
+  </div>
+</div>
+{% endblock %}
