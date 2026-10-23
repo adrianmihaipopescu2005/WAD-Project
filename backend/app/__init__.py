@@ -1,0 +1,59 @@
+from pathlib import Path
+
+import click
+from flask import Flask
+
+from .config import Config
+from .extensions import csrf, db, login_manager
+from .models import ROLE_ADMIN, User
+
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+
+
+def create_app(config_class=Config):
+    app = Flask(
+        __name__,
+        template_folder=str(FRONTEND_DIR / "templates"),
+        static_folder=str(FRONTEND_DIR / "static"),
+    )
+    app.config.from_object(config_class)
+
+    if not app.config["SQLALCHEMY_DATABASE_URI"]:
+        Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+        db_path = Path(app.instance_path) / "app.db"
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path.as_posix()}"
+
+    db.init_app(app)
+    csrf.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+
+    from .blueprints.main.routes import bp as main_bp
+
+    app.register_blueprint(main_bp)
+
+    _register_cli(app)
+    return app
+
+
+@login_manager.user_loader
+def _load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
+def _register_cli(app):
+    @app.cli.command("init-db")
+    @click.option("--email", prompt=True, help="Admin (professor) email.")
+    @click.option("--name", prompt=True, help="Admin display name.")
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def init_db(email, name, password):
+        """Create the tables and the admin account (skipped if the email already exists)."""
+        db.create_all()
+        if db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none():
+            click.echo(f"User {email} already exists, tables are ready.")
+            return
+        admin = User(email=email, name=name, role=ROLE_ADMIN)
+        admin.set_password(password)
+        db.session.add(admin)
+        db.session.commit()
+        click.echo(f"Created admin {email}.")
