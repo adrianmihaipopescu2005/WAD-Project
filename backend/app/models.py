@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from flask_login import UserMixin
 from sqlalchemy import CheckConstraint
@@ -121,6 +121,11 @@ class Absence(db.Model):
     @property
     def slot_label(self):
         return SLOTS[self.slot][0]
+
+    @property
+    def end_date(self):
+        """Date of the last lab session this absence covers."""
+        return self.start_date + timedelta(weeks=self.sessions_count - 1)
 
     def covers(self, day: date) -> bool:
         """True if this absence excuses the student from the lab session on `day`."""

@@ -3,7 +3,7 @@
 Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M3: Assistant management.** Done and pushed. Next up is **M4: Students**.
+**M4: Students.** Done and pushed. Next up is **M5: Absences**.
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -21,14 +21,20 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
   - Admin pages: list, add and remove lab assistants.
   - Removal moves the students to another assistant in one transaction (confirmation modal).
   - 67 tests pass.
+- **M4:**
+  - Students list (search, admin filter by assistant), add, edit, delete (cascades absences), profile with an absences table.
+  - Scoped per assistant (others' students give 404). The admin picks or reassigns the assistant.
+  - 103 tests pass.
 
 ## Next
-1. **M4: Students (WAD "customers").**
-   - `students` blueprint: students page (list), add student, edit student, delete student (with confirmation; their absences go too), student profile page (details plus their absences).
-   - Assistants see and change only their own students. An admin sees all, can filter by assistant, and picks the assistant when adding a student.
-   - Navbar "Students" link.
-   - Tests: scoping (another assistant's student gives 404), unique student number, validation, delete cascades absences.
-2. Then M5 (absences) → M6 (public form) → M7 (API) → M8 (polish).
+1. **M5: Absences (WAD "licenses").**
+   - `absences` blueprint: absences page (list, filter by student, plus status/slot filters), create-absence page (student, slot, start date, sessions, reason).
+   - Revoke: POST, sets `revoked`, keeps the row.
+   - Extend: POST, adds sessions.
+   - Scoped per assistant (only own students' absences; an admin sees all). Server-side check that the date matches the slot's weekday, shown as a form error.
+   - "Add absence" button on the student profile (preselects the student). Revoke/extend from the profile too.
+   - Tests: scoping, slot/date validation, revoke keeps the row, extend increments, can't extend a revoked absence, CSRF.
+2. Then M6 (public form) → M7 (API) → M8 (polish).
 
 ## Blocked / open questions
 - **M6:** how does a public-form submission find its assistant? (For example, by matching `student_number` against registered students.)

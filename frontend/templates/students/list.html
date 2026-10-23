@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Students · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">{{ "Students" if current_user.is_admin else "My students" }}</h1>
+  <a class="btn btn-primary" href="{{ url_for('students.new') }}">Add student</a>
+</div>
+
+<form class="row g-2 mb-3" method="get" role="search">
+  <div class="col-sm">
+    <label class="visually-hidden" for="q">Search</label>
+    <input class="form-control" type="search" id="q" name="q" value="{{ q }}"
+           placeholder="Search by name or student number">
+  </div>
+  {% if current_user.is_admin %}
+    <div class="col-sm-4">
+      <label class="visually-hidden" for="assistant">Lab assistant</label>
+      <select class="form-select" id="assistant" name="assistant">
+        <option value="">All lab assistants</option>
+        {% for a, _count in assistants %}
+          <option value="{{ a.id }}" {{ "selected" if a.id == selected_assistant }}>{{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+  <div class="col-auto">
+    <button class="btn btn-outline-primary" type="submit">Filter</button>
+    {% if q or selected_assistant %}
+      <a class="btn btn-link" href="{{ url_for('students.index') }}">Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if not students %}
+  <div class="alert alert-secondary">
+    {% if q or selected_assistant %}No students match this filter.{% else %}No students yet.{% endif %}
+  </div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Student number</th>
+          <th scope="col">Name</th>
+          <th scope="col">Group</th>
+          <th scope="col">Email</th>
+          {% if current_user.is_admin %}<th scope="col">Lab assistant</th>{% endif %}
+          <th scope="col" class="text-end">Active absences</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student, active_count in students %}
+          <tr>
+            <td>{{ student.student_number }}</td>
+            <td>
+              <a href="{{ url_for('students.profile', student_id=student.id) }}">{{ student.full_name }}</a>
+            </td>
+            <td>{{ student.study_group or "—" }}</td>
+            <td>{{ student.email or "—" }}</td>
+            {% if current_user.is_admin %}<td>{{ student.assistant.name }}</td>{% endif %}
+            <td class="text-end" data-active="{{ student.id }}">{{ active_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

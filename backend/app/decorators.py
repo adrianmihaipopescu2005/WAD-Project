@@ -4,7 +4,7 @@ from flask import abort
 from flask_login import current_user
 
 from .extensions import login_manager
-from .models import ROLE_ADMIN
+from .models import ROLE_ADMIN, ROLE_ASSISTANT
 
 
 def role_required(*roles):
@@ -25,3 +25,4 @@ def role_required(*roles):
 
 
 admin_required = role_required(ROLE_ADMIN)
+staff_required = role_required(ROLE_ADMIN, ROLE_ASSISTANT)

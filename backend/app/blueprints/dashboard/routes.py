@@ -1,15 +1,15 @@
 from flask import Blueprint, render_template
 from flask_login import current_user
 
-from ...decorators import role_required
+from ...decorators import staff_required
 from ...extensions import db
-from ...models import ROLE_ADMIN, ROLE_ASSISTANT, STATUS_ACTIVE, Absence, Student, User
+from ...models import ROLE_ASSISTANT, STATUS_ACTIVE, Absence, Student, User
 
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 
 @bp.get("/")
-@role_required(ROLE_ADMIN, ROLE_ASSISTANT)
+@staff_required
 def index():
     students = db.select(db.func.count(Student.id))
     absences = (

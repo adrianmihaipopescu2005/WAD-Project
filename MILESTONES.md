@@ -7,7 +7,7 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M1: Flask skeleton.** App factory, config, SQLite + models (`User`, `Student`, `Absence`) with FKs/CHECKs, `init-db` command that creates the admin, Bootstrap `base.html`, pytest setup.
 - [x] **M2: Authentication.** Login/logout page, `admin`/`assistant` roles, role-required decorators, CSRF.
 - [x] **M3: Assistant management (admin).** Add and remove lab assistants. Removing one reassigns their students.
-- [ ] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
+- [x] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
 - [ ] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
 - [ ] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
 - [ ] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
@@ -17,6 +17,19 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - M6: how does a public-form submission find its assistant? (See `adr/shared/shared-domain-mapping.md`.)
 
 ## Log
+### M4: Students (2026-10-23)
+- `services/students.py`:
+  - Every query goes through `_visible_to(user)`: an assistant sees only their own students, an admin sees all.
+  - `list_students` (active-absence count, admin filter by assistant, search by name or number), `get_student` (None if not visible), `create_student`/`update_student` (unique student number), `delete_student` (absences CASCADE).
+- `students` blueprint (`staff_required`, a new decorator alias for admin + assistant):
+  - `GET /students/`: list, search, admin assistant filter, empty states.
+  - `GET/POST /students/new`, `GET/POST /students/<id>/edit`.
+  - `GET /students/<id>`: profile with details and an absences table (slot, from, until, sessions, reason, source, status).
+  - `POST /students/<id>/delete`: confirmation modal, CSRF.
+- Owner rules: an assistant's new students are always assigned to themselves (no select, and a posted `assistant_id` is ignored). An admin picks the assistant when adding, and can reassign when editing. An admin with no assistants is sent to add one first. Another assistant's student gives **404**.
+- `Absence.end_date` (last covered session). `_macros/absences.html` (status badge, source label) for M5. Navbar "Students" link.
+- Tests: `test_students.py` (36 tests). **103 passed** in total, ruff clean. Also checked end to end with CSRF on.
+
 ### M3: Assistant management (2026-10-23)
 - `services/assistants.py`:
   - `list_assistants` (with student counts) and `create_assistant` (case-insensitive duplicate-email check).

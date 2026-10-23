@@ -1,0 +1,11 @@
+{% macro status_badge(absence) %}
+  {% if absence.status == "active" %}
+    <span class="badge text-bg-success">Active</span>
+  {% else %}
+    <span class="badge text-bg-secondary">Revoked</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro source_label(absence) %}
+  {{ "Student form" if absence.source == "public" else "Added by staff" }}
+{% endmacro %}

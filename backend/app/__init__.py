@@ -36,11 +36,13 @@ def create_app(config_class=Config):
     from .blueprints.auth.routes import bp as auth_bp
     from .blueprints.dashboard.routes import bp as dashboard_bp
     from .blueprints.main.routes import bp as main_bp
+    from .blueprints.students.routes import bp as students_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(students_bp)
 
     # The navbar's logout button is a POST form on every page.
     app.context_processor(lambda: {"logout_form": LogoutForm()})
