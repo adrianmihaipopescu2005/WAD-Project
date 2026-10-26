@@ -24,5 +24,7 @@ The course requires 2–3 dynamic features, meaning JavaScript that talks to the
 - Each feature can be demoed by showing that the network tab has no page reload.
 - The same service functions serve both the HTML and JSON routes, so the rules aren't duplicated.
 
+- **Smart-form lookup privacy (decided 2026-10-26):** the public lookup reveals only the **initials and group** (for example "A. P. · group 2.1"), never the full name, email or assistant. An unknown number just says "not found".
+
 ## Open questions
-- Smart form student lookup: the form is public, so showing a student's full name for any typed number would leak names. Options: show only initials (for example "A. P."), show just "found / not found", or drop the lookup. To be decided before M6.
+- None.

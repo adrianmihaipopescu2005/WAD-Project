@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros/forms.html" import render_field %}
+
+{% block title %}Report an absence · Lab Absence Manager{% endblock %}
+
+{% macro errors(field) %}
+  {% for error in field.errors %}<div class="invalid-feedback" data-server-error>{{ error }}</div>{% endfor %}
+{% endmacro %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-9 col-lg-7">
+    <h1 class="h3 mb-1">Report an absence</h1>
+    <p class="text-body-secondary">
+      Mobile Systems and Applications lab · Tuesday and Thursday 18–20.
+      Your lab assistant will see this report.
+    </p>
+
+    <form method="post" novalidate id="report-form"
+          data-lookup-endpoint="{{ url_for('public.lookup') }}">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.student_number.label(class="form-label") }}
+        {{ form.student_number(class="form-control" ~ (" is-invalid" if form.student_number.errors else ""),
+                               autocomplete="off", **{"aria-describedby": "student_number-help lookup-status"}) }}
+        {{ errors(form.student_number) }}
+        <div id="student_number-help" class="form-text">{{ form.student_number.description }}</div>
+        <div id="lookup-status" class="form-text" aria-live="polite"></div>
+      </div>
+
+      <div class="row">
+        <div class="col-sm-6 mb-3">
+          {{ form.slot.label(class="form-label") }}
+          <select class="form-select{{ ' is-invalid' if form.slot.errors }}" id="slot" name="slot" required>
+            {% for code, (label, weekday) in slots.items() %}
+              {# data-weekday uses JavaScript numbering: Sunday = 0. #}
+              <option value="{{ code }}" data-weekday="{{ (weekday + 1) % 7 }}"
+                      data-day-name="{{ label.split()[0] }}"
+                      {{ "selected" if form.slot.data == code }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {{ errors(form.slot) }}
+        </div>
+        <div class="col-sm-6 mb-3">
+          {{ form.start_date.label(class="form-label") }}
+          {{ form.start_date(class="form-control" ~ (" is-invalid" if form.start_date.errors else ""),
+                             type="date", **{"aria-describedby": "start_date-help"}) }}
+          {{ errors(form.start_date) }}
+          <div class="invalid-feedback" id="start_date-js-error" hidden></div>
+          <div id="start_date-help" class="form-text">
+            {{ form.start_date.description }}
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="next-session" hidden></button>
+          </div>
+        </div>
+      </div>
+
+      {{ render_field(form.sessions_count, type="number", min=1, max=max_sessions) }}
+      <div id="coverage" class="alert alert-info py-2" aria-live="polite" hidden></div>
+
+      {{ render_field(form.reason, rows=3, maxlength=500) }}
+
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/smart-form.js') }}"></script>
+{% endblock %}

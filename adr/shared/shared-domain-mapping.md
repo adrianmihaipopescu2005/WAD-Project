@@ -26,5 +26,7 @@ One app has to serve as the Mobile Systems and Applications lab-absence tool and
 - Every page the WAD spec asks for exists, with absence wording.
 - The public form adds a page the spec doesn't have. It creates absences without logging in.
 
+- **Public-form routing (decided 2026-10-26):** a submission is matched by `student_number` against the registered students and goes to that student's assistant. Unknown numbers are rejected ("Student number not found, contact your lab assistant"). Public submissions never create students. They're stored with `source = 'public'`.
+
 ## Open questions
-- How does a public-form submission find its assistant? For example, it matches `student_number` against students the assistants have registered (unknown numbers are rejected), or the student picks an assistant.
+- None.

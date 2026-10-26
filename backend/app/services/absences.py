@@ -7,6 +7,7 @@ from ..models import (
     MAX_SESSIONS,
     SLOTS,
     SOURCE_ASSISTANT,
+    SOURCE_PUBLIC,
     STATUS_ACTIVE,
     STATUS_REVOKED,
     Absence,
@@ -99,3 +100,40 @@ def extend(absence, extra_sessions):
         raise AbsenceError(f"An absence can cover at most {MAX_SESSIONS} sessions.", 400)
     absence.sessions_count += extra_sessions
     db.session.commit()
+
+
+# --- public (no login) ---------------------------------------------------------------
+
+def find_student_by_number(student_number):
+    number = (student_number or "").strip()
+    if not number:
+        return None
+    return db.session.execute(
+        db.select(Student).where(Student.student_number == number)
+    ).scalar_one_or_none()
+
+
+def public_lookup(student_number):
+    """What the public form may reveal about a student number: initials and group only."""
+    student = find_student_by_number(student_number)
+    if student is None:
+        return {"found": False}
+    initials = f"{student.first_name[:1].upper()}. {student.last_name[:1].upper()}."
+    return {"found": True, "initials": initials, "group": student.study_group}
+
+
+def _covering_absence(student, slot, day):
+    stmt = db.select(Absence).where(
+        Absence.student_id == student.id, Absence.slot == slot, Absence.status == STATUS_ACTIVE
+    )
+    return next((a for a in db.session.execute(stmt).scalars() if a.covers(day)), None)
+
+
+def submit_public(student_number, slot, start_date, sessions_count, reason):
+    """A student's own report. It goes to the assistant who registered their student number."""
+    student = find_student_by_number(student_number)
+    if student is None:
+        raise AbsenceError("Student number not found. Contact your lab assistant.", 404)
+    if slot in SLOTS and _covering_absence(student, slot, start_date):
+        raise AbsenceError("You already reported an absence for this session.")
+    return create_absence(student, slot, start_date, sessions_count, reason, SOURCE_PUBLIC)

@@ -6,8 +6,9 @@ from ...models import MAX_SESSIONS, SLOTS
 from ...services.absences import slot_date_error
 
 
-class AbsenceForm(FlaskForm):
-    student_id = SelectField("Student", coerce=int, validators=[DataRequired()])
+class AbsenceFieldsForm(FlaskForm):
+    """Fields shared by the staff form and the public student form."""
+
     slot = SelectField(
         "Lab slot",
         choices=[(code, label) for code, (label, _weekday) in SLOTS.items()],
@@ -25,10 +26,14 @@ class AbsenceForm(FlaskForm):
         description="How many weekly sessions in a row the absence covers.",
     )
     reason = TextAreaField("Reason", validators=[DataRequired(), Length(max=500)])
-    submit = SubmitField("Add absence")
 
     def validate_start_date(self, field):
         if field.data and self.slot.data in SLOTS:
             error = slot_date_error(self.slot.data, field.data)
             if error:
                 raise ValidationError(error)
+
+
+class AbsenceForm(AbsenceFieldsForm):
+    student_id = SelectField("Student", coerce=int, validators=[DataRequired()])
+    submit = SubmitField("Add absence")

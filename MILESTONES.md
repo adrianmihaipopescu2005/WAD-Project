@@ -10,17 +10,33 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
 - [x] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
   - Dynamic: **revoke/extend in place** (fetch, no reload) and **live search** on the absences and students pages.
-- [ ] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
+- [x] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
   - Dynamic: **smart form** (only valid weekdays, live "covered until" date, student number lookup).
 - [ ] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
   - Dynamic: **excused-check widget** calling the API.
 - [ ] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
 ## Open questions
-- M6: the public form's student lookup must not leak names. Show initials only, show found / not found, or drop it? (See `adr/shared/shared-dynamic-features.md`.)
-- M6: how does a public-form submission find its assistant? (See `adr/shared/shared-domain-mapping.md`.)
+- None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M6: Public absence form + smart form (2026-10-26)
+- `public` blueprint (no login, CSRF on):
+  - `GET/POST /report/`: student number, slot, first missed date, sessions, reason.
+  - `GET /report/thanks`: a one-time summary from the session, initials only.
+  - `GET /report/lookup.json`.
+- Routing (decision of 2026-10-26): the submission is matched by the exact student number (whitespace stripped) to the registered student, so it reaches their assistant. Unknown numbers are rejected. It's stored with `source = 'public'` and never creates students.
+- Rejects a duplicate report for a session that an **active** absence of the same slot already covers. After a revoke, the student can report again.
+- `AbsenceFieldsForm` (slot, date with the weekday validator, sessions, reason) is shared by the staff form and `PublicAbsenceForm`.
+- **Dynamic smart form** (`static/js/smart-form.js`, no reload):
+  - Weekday check per slot, plus a "Use Tuesday/Thursday <next date>" shortcut.
+  - Live "Covers N sessions: … until …" (UTC date math, so time zones never shift the day).
+  - Debounced student-number lookup showing "✓ Found: A. P. · group 2.1" or "not found".
+  - The server re-validates everything, and the form works without JS.
+- Privacy (decision of 2026-10-26): the lookup and the thanks page reveal **initials and group only**, never the full name, email or assistant. A test checks this.
+- Home page: "Report an absence" button.
+- Tests: `test_public.py` (27 tests). **177 passed** in total, ruff clean, `node --check` OK. The JS has **not yet been tested in a real browser**.
+
 ### M5: Absences + first dynamic features (2026-10-26)
 - `services/absences.py`:
   - Every query is scoped through a join on Student (an assistant sees only their students' absences).
