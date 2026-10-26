@@ -15,6 +15,9 @@ SLOTS = {
     "THU_18_20": ("Thursday 18–20", 3),
 }
 
+# One semester has 14 weekly sessions per slot.
+MAX_SESSIONS = 14
+
 STATUS_ACTIVE = "active"
 STATUS_REVOKED = "revoked"
 

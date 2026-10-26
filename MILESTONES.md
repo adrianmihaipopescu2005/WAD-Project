@@ -8,15 +8,43 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M2: Authentication.** Login/logout page, `admin`/`assistant` roles, role-required decorators, CSRF.
 - [x] **M3: Assistant management (admin).** Add and remove lab assistants. Removing one reassigns their students.
 - [x] **M4: Students (WAD "customers").** Add/edit/delete student, students page, student profile page. Assistants are scoped to their own students.
-- [ ] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
+- [x] **M5: Absences (WAD "licenses").** Create-absence page, absences page with a filter by student, revoke, extend. Scoped per assistant.
+  - Dynamic: **revoke/extend in place** (fetch, no reload) and **live search** on the absences and students pages.
 - [ ] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
+  - Dynamic: **smart form** (only valid weekdays, live "covered until" date, student number lookup).
 - [ ] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
+  - Dynamic: **excused-check widget** calling the API.
 - [ ] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
 ## Open questions
+- M6: the public form's student lookup must not leak names. Show initials only, show found / not found, or drop it? (See `adr/shared/shared-dynamic-features.md`.)
 - M6: how does a public-form submission find its assistant? (See `adr/shared/shared-domain-mapping.md`.)
 
 ## Log
+### M5: Absences + first dynamic features (2026-10-26)
+- `services/absences.py`:
+  - Every query is scoped through a join on Student (an assistant sees only their students' absences).
+  - `list_absences`: filters for student, status, slot, a name/number search and (admin) assistant.
+  - `create_absence`: slot/weekday check and 1–14 sessions (`MAX_SESSIONS`, one semester).
+  - `revoke`: keeps the row, sets `revoked_at`. Revoking twice gives 409.
+  - `extend`: only active absences (409 otherwise), at least 1 extra session, capped at 14.
+- `absences` blueprint:
+  - `GET /absences/`: list with filters.
+  - `GET /absences/search.json`: live search.
+  - `GET/POST /absences/new`: `?student_id=` preselects the student, and a slot/date mismatch shows as a form error.
+  - `POST /absences/<id>/revoke`, `POST /absences/<id>/extend`: JSON for fetch, otherwise a flash message and a redirect to a safe `next`.
+- `GET /students/search.json`: live search on the students page. The results are now in the `students/_results.html` partial.
+- **Dynamic features (no reload):**
+  - `static/js/common.js`: `App.fetchJson` (Accept JSON, `X-CSRFToken` from `<meta name="csrf-token">`, an expired session detected as an HTML response) and `App.showAlert`.
+  - `static/js/live-search.js`: debounced 250 ms, aborts stale requests, updates the URL with `history.replaceState`.
+  - `static/js/absence-actions.js`: revoke/extend through `fetch`. The server returns the re-rendered `_row.html`, which replaces the row. Event delegation, so it also works on rows added by live search.
+  - Every page still works without JS (GET filter forms, POST forms with redirect).
+- JSON endpoints return the rendered partial (`{count, html}`), so the markup is written once, in Jinja, and is auto-escaped.
+- `wants_json()` helper. The 400/403/404/405 handlers answer `{"error": ...}` to fetch calls, including CSRF failures.
+- Student profile: "Add absence" button and revoke/extend in place, using the shared `absences/_table.html` and `_row.html`. Navbar "Absences" link. The form macro uses `form-select` for selects.
+- Pinned `WTForms==3.3.0`: tuple `SelectField` choices are deprecated and are removed in 3.4.
+- Tests: `test_absences.py` (47 tests: scoping in HTML and JSON, filters, live search incl. escaping, create validation, revoke/extend with and without JS, the max-sessions cap, CSRF through the `X-CSRFToken` header). **150 passed** in total, ruff clean. The JS files pass `node --check`. The JS behaviour has **not yet been tested in a real browser**.
+
 ### M4: Students (2026-10-23)
 - `services/students.py`:
   - Every query goes through `_visible_to(user)`: an assistant sees only their own students, an admin sees all.

@@ -11,6 +11,23 @@ def _visible_to(stmt, user):
     return stmt if user.is_admin else stmt.where(Student.assistant_id == user.id)
 
 
+def search_clause(q):
+    """WHERE clause matching a student's number, first, last or full name (case-insensitive)."""
+    pattern = f"%{q.strip()}%"
+    return db.or_(
+        Student.student_number.ilike(pattern),
+        Student.first_name.ilike(pattern),
+        Student.last_name.ilike(pattern),
+        (Student.first_name + " " + Student.last_name).ilike(pattern),
+    )
+
+
+def visible_students(user):
+    """All students `user` may see, ordered by name (for select boxes)."""
+    stmt = _visible_to(db.select(Student), user).order_by(Student.last_name, Student.first_name)
+    return db.session.execute(stmt).scalars().all()
+
+
 def list_students(user, assistant_id=None, q=None):
     """Students visible to `user`, each with their count of active absences."""
     active = (
@@ -22,13 +39,7 @@ def list_students(user, assistant_id=None, q=None):
     if user.is_admin and assistant_id:
         stmt = stmt.where(Student.assistant_id == assistant_id)
     if q:
-        pattern = f"%{q.strip()}%"
-        stmt = stmt.where(db.or_(
-            Student.student_number.ilike(pattern),
-            Student.first_name.ilike(pattern),
-            Student.last_name.ilike(pattern),
-            (Student.first_name + " " + Student.last_name).ilike(pattern),
-        ))
+        stmt = stmt.where(search_clause(q))
     stmt = stmt.order_by(Student.last_name, Student.first_name)
     return db.session.execute(stmt).all()
 

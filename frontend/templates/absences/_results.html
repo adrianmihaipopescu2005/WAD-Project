@@ -1,0 +1,9 @@
+{#- Absences table or empty state. Rendered by the page and by the live-search JSON endpoint.
+    Needs: absences, filtered, next_url. -#}
+{% if not absences %}
+  <div class="alert alert-secondary">
+    {% if filtered %}No absences match this filter.{% else %}No absences yet.{% endif %}
+  </div>
+{% else %}
+  {% include "absences/_table.html" %}
+{% endif %}

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from "_macros/absences.html" import status_badge, source_label %}
 
 {% block title %}{{ student.full_name }} · Lab Absence Manager{% endblock %}
 
@@ -33,38 +32,16 @@
   </div>
 </div>
 
-<h2 class="h5">Absences</h2>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+  <h2 class="h5 mb-0">Absences</h2>
+  <a class="btn btn-primary btn-sm"
+     href="{{ url_for('absences.new', student_id=student.id) }}">Add absence</a>
+</div>
 {% if not absences %}
   <div class="alert alert-secondary">No absences reported.</div>
 {% else %}
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead>
-        <tr>
-          <th scope="col">Slot</th>
-          <th scope="col">From</th>
-          <th scope="col">Until</th>
-          <th scope="col" class="text-end">Sessions</th>
-          <th scope="col">Reason</th>
-          <th scope="col">Source</th>
-          <th scope="col">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for a in absences %}
-          <tr>
-            <td>{{ a.slot_label }}</td>
-            <td>{{ a.start_date.isoformat() }}</td>
-            <td>{{ a.end_date.isoformat() }}</td>
-            <td class="text-end">{{ a.sessions_count }}</td>
-            <td class="text-break">{{ a.reason }}</td>
-            <td>{{ source_label(a) }}</td>
-            <td>{{ status_badge(a) }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% set show_student = false %}
+  {% include "absences/_table.html" %}
 {% endif %}
 
 <div class="modal fade" id="delete-student" tabindex="-1" aria-labelledby="delete-student-title" aria-hidden="true">
@@ -85,4 +62,8 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/absence-actions.js') }}"></script>
 {% endblock %}

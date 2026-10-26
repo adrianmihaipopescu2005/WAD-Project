@@ -1,0 +1,24 @@
+{#- Needs: absences, next_url; show_student defaults to true. -#}
+{% set show_student = show_student if show_student is defined else true %}
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        {% if show_student %}<th scope="col">Student</th>{% endif %}
+        <th scope="col">Slot</th>
+        <th scope="col">From</th>
+        <th scope="col">Until</th>
+        <th scope="col" class="text-end">Sessions</th>
+        <th scope="col">Reason</th>
+        <th scope="col">Source</th>
+        <th scope="col">Status</th>
+        <th scope="col" class="text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in absences %}
+        {% include "absences/_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

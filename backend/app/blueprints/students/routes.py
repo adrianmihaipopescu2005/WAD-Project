@@ -28,18 +28,35 @@ def _form_data(form):
             ("student_number", "first_name", "last_name", "email", "study_group")}
 
 
+def _list_filters():
+    assistant_id = request.args.get("assistant", type=int) if current_user.is_admin else None
+    return assistant_id, request.args.get("q", "").strip()
+
+
 @bp.get("/")
 @staff_required
 def index():
-    assistant_id = request.args.get("assistant", type=int)
-    q = request.args.get("q", "").strip()
+    assistant_id, q = _list_filters()
     return render_template(
         "students/list.html",
         students=service.list_students(current_user, assistant_id, q),
         assistants=list_assistants() if current_user.is_admin else [],
         selected_assistant=assistant_id,
         q=q,
+        filtered=bool(q or assistant_id),
     )
+
+
+@bp.get("/search.json")
+@staff_required
+def search():
+    """Live search: the same filters as the page, returning the rendered results."""
+    assistant_id, q = _list_filters()
+    students = service.list_students(current_user, assistant_id, q)
+    html = render_template(
+        "students/_results.html", students=students, filtered=bool(q or assistant_id)
+    )
+    return {"count": len(students), "html": html}
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -66,9 +83,10 @@ def new():
 @staff_required
 def profile(student_id):
     student = _student_or_404(student_id)
-    absences = sorted(student.absences, key=lambda a: a.start_date, reverse=True)
+    absences = sorted(student.absences, key=lambda a: (a.start_date, a.id), reverse=True)
     return render_template(
-        "students/profile.html", student=student, absences=absences, delete_form=FlaskForm()
+        "students/profile.html", student=student, absences=absences, delete_form=FlaskForm(),
+        next_url=url_for("students.profile", student_id=student.id),
     )
 
 

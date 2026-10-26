@@ -5,8 +5,9 @@ from flask import Flask, render_template
 
 from .config import Config
 from .extensions import csrf, db, login_manager
-from .models import ROLE_ADMIN, User
+from .models import MAX_SESSIONS, ROLE_ADMIN, User
 from .services.auth import normalize_email
+from .utils import wants_json
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
@@ -31,6 +32,7 @@ def create_app(config_class=Config):
     login_manager.login_message = "Please log in to access this page."
     login_manager.login_message_category = "warning"
 
+    from .blueprints.absences.routes import bp as absences_bp
     from .blueprints.admin.routes import bp as admin_bp
     from .blueprints.auth.forms import LogoutForm
     from .blueprints.auth.routes import bp as auth_bp
@@ -43,9 +45,10 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(students_bp)
+    app.register_blueprint(absences_bp)
 
     # The navbar's logout button is a POST form on every page.
-    app.context_processor(lambda: {"logout_form": LogoutForm()})
+    app.context_processor(lambda: {"logout_form": LogoutForm(), "max_sessions": MAX_SESSIONS})
 
     _register_error_handlers(app)
     _register_cli(app)
@@ -53,10 +56,16 @@ def create_app(config_class=Config):
 
 
 def _register_error_handlers(app):
-    for code in (403, 404):
-        app.register_error_handler(
-            code, lambda e, code=code: (render_template(f"errors/{code}.html"), code)
-        )
+    def handle(e):
+        if wants_json():
+            return {"error": e.description}, e.code
+        if e.code in (403, 404):
+            return render_template(f"errors/{e.code}.html"), e.code
+        return e
+
+    # 400 also covers CSRFError (a BadRequest subclass).
+    for code in (400, 403, 404, 405):
+        app.register_error_handler(code, handle)
 
 
 @login_manager.user_loader

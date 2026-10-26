@@ -3,7 +3,7 @@
 Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M4: Students.** Done and pushed. Next up is **M5: Absences**.
+**M5: Absences.** Done and pushed. Next up is **M6: Public absence form** (needs the lookup privacy decision below).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -25,18 +25,20 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
   - Students list (search, admin filter by assistant), add, edit, delete (cascades absences), profile with an absences table.
   - Scoped per assistant (others' students give 404). The admin picks or reassigns the assistant.
   - 103 tests pass.
+- **M5:**
+  - Absences page (filters: student, status, slot, search, admin assistant filter), create-absence page (slot/weekday check, 1–14 sessions).
+  - Revoke (keeps the row) and extend (active only, max 14).
+  - Scoped per assistant. "Add absence" plus revoke/extend on the student profile.
+  - **Dynamic:** revoke/extend in place and live search (absences + students) via `fetch`. Every page still works without JS.
+  - 150 tests pass. The JS hasn't been tried in a real browser yet.
 
 ## Next
-1. **M5: Absences (WAD "licenses").**
-   - `absences` blueprint: absences page (list, filter by student, plus status/slot filters), create-absence page (student, slot, start date, sessions, reason).
-   - Revoke: POST, sets `revoked`, keeps the row.
-   - Extend: POST, adds sessions.
-   - Scoped per assistant (only own students' absences; an admin sees all). Server-side check that the date matches the slot's weekday, shown as a form error.
-   - "Add absence" button on the student profile (preselects the student). Revoke/extend from the profile too.
-   - Tests: scoping, slot/date validation, revoke keeps the row, extend increments, can't extend a revoked absence, CSRF.
-2. Then M6 (public form) → M7 (API) → M8 (polish).
+1. **M6: Public absence form.** Plus the dynamic **smart form** (Tue/Thu-only dates, live "covered until" date, student lookup). **Needs both open questions below answered first.**
+2. **M7:** validation API plus the dynamic **excused-check widget**.
+3. **M8:** polish (demo seed data, README, a manual browser check of every dynamic feature).
 
 ## Blocked / open questions
+- **M6 smart form:** the student number lookup is public, so how much should it reveal? Initials only / found or not found / no lookup.
 - **M6:** how does a public-form submission find its assistant? (For example, by matching `student_number` against registered students.)
 
 ## Decisions so far
@@ -44,6 +46,7 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
 - Students use a public form with no login. Revoke = reject/cancel. Extend = covers more weekly sessions.
 - The API checks whether a student is excused on a given date.
 - Stack: Flask + Bootstrap 5 + SQLite. Milestones are tracked in `MILESTONES.md` + git, and the current state here in `STEP.md`.
+- Dynamic features, a course requirement (decided 2026-10-23): revoke/extend in place, live search, smart absence form, excused-check widget. Vanilla JS `fetch` + JSON, progressive enhancement. See `adr/shared/shared-dynamic-features.md`.
 - Templates/static live in `frontend/`, and the Flask app in `backend/app/`.
 - Removing an assistant reassigns their students to another assistant chosen by the admin (decided 2026-10-23). The DB keeps `ON DELETE RESTRICT` as a safety net.
 - Deleting a student also deletes their absences (CASCADE). Revoking an absence never deletes it.

@@ -7,6 +7,7 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 ## Hard constraints
 - Stack: **Python + Flask** backend, **HTML/CSS/JavaScript + Bootstrap 5** frontend. No PHP, no Firebase, no NoSQL, no SPA frameworks (React/Vue/Angular).
 - Database: **SQLite** through Flask-SQLAlchemy. Relational only: every relation has a foreign key (`PRAGMA foreign_keys=ON`), and each multi-step write runs in one transaction.
+- Dynamic features (course requirement): vanilla JS `fetch` + JSON, with no page reload and progressive enhancement. See `adr/shared/shared-dynamic-features.md`.
 - Two logged-in roles only: `admin` (professor) and `assistant` (lab assistant). Students do **not** have accounts. They use the public absence form.
 
 ## Invariants

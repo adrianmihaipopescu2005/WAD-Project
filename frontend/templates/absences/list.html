@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Absences · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">{{ "Absences" if current_user.is_admin else "My students' absences" }}</h1>
+  <a class="btn btn-primary" href="{{ url_for('absences.new') }}">Add absence</a>
+</div>
+
+<form class="row g-2 mb-2" method="get" role="search"
+      data-live-search data-endpoint="{{ url_for('absences.search') }}"
+      data-target="#absence-results" data-count="#absence-count">
+  <div class="col-md">
+    <label class="visually-hidden" for="q">Search</label>
+    <input class="form-control" type="search" id="q" name="q" value="{{ filters.q or '' }}"
+           placeholder="Search by student name or number" autocomplete="off">
+  </div>
+  <div class="col-sm-6 col-md-3">
+    <label class="visually-hidden" for="student">Student</label>
+    <select class="form-select" id="student" name="student">
+      <option value="">All students</option>
+      {% for s in students %}
+        <option value="{{ s.id }}" {{ "selected" if s.id == filters.student_id }}>
+          {{ s.full_name }} ({{ s.student_number }})
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="visually-hidden" for="status">Status</label>
+    <select class="form-select" id="status" name="status">
+      <option value="">Any status</option>
+      <option value="active" {{ "selected" if filters.status == "active" }}>Active</option>
+      <option value="revoked" {{ "selected" if filters.status == "revoked" }}>Revoked</option>
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="visually-hidden" for="slot">Slot</label>
+    <select class="form-select" id="slot" name="slot">
+      <option value="">Any slot</option>
+      {% for code, (label, _weekday) in slots.items() %}
+        <option value="{{ code }}" {{ "selected" if filters.slot == code }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if current_user.is_admin %}
+    <div class="col-sm-6 col-md-3">
+      <label class="visually-hidden" for="assistant">Lab assistant</label>
+      <select class="form-select" id="assistant" name="assistant">
+        <option value="">All lab assistants</option>
+        {% for a, _count in assistants %}
+          <option value="{{ a.id }}" {{ "selected" if a.id == filters.assistant_id }}>{{ a.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+  <div class="col-auto">
+    <button class="btn btn-outline-primary" type="submit">Filter</button>
+    <a class="btn btn-link" href="{{ url_for('absences.index') }}">Clear</a>
+  </div>
+</form>
+<p class="small text-body-secondary mb-3">
+  <span id="absence-count">{{ absences | length }}</span> result(s)
+</p>
+
+<div id="absence-results">
+  {% include "absences/_results.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/live-search.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/absence-actions.js') }}"></script>
+{% endblock %}
