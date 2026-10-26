@@ -20,6 +20,20 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### Restyle: "modern clean" theme + dark mode (2026-10-26)
+- User choice: the "modern clean" direction, plus a dark mode toggle, icons, a new home page and subtle animations. See `adr/frontend/frontend-theme.md`.
+- `static/css/app.css` rewritten around `--lam-*` color tokens on top of Bootstrap's CSS variables (light and dark):
+  - indigo accent, Inter font, soft gray page, rounded cards with soft shadows;
+  - tables shown as cards, soft status badges, focus rings.
+- `static/js/theme.js`: dark mode from the saved choice or the system setting, applied before paint. The toggle has `aria-pressed`.
+- `base.html`: frosted white navbar with a brand mark, icon nav links, a user chip with an avatar, and the theme toggle. Bootstrap Icons 1.11.3 (SRI) and Inter loaded.
+- Home page: a hero with a "Report an absence" call to action, lab-session pills, and "How it works" in 3 steps.
+- Dashboard: welcome header, stat cards with colored icons, and the excused-check card. Page headers with subtitles on the lists. Login and all forms are shown as cards. Empty states have icons, error pages are restyled, and the student profile has an avatar.
+- Animations: alerts and live-search results fade in, and rows updated by revoke/extend flash. All of them are off with `prefers-reduced-motion`.
+- Checked in Chrome in light and dark mode (home, dashboard, absences, profile). Fixed during the check: the cramped absences filter row (search now has its own row), dates wrapping inside cells, button icons wrapping, and "Welcome back, Prof." (now the full name). No console errors.
+- README: every command written for PowerShell (`cd backend`, `.\.venv\Scripts\flask …`), plus the theme mentioned.
+- 242 tests still pass.
+
 ### M8: Polish, review fixes, browser check (2026-10-26)
 - **`flask seed-demo`** (`app/seed.py`): an admin, 2 assistants, 7 students and 6 absences, dated relative to today, in one transaction. It only fills an empty database. `--reset` asks first.
 - **Final review** by the 4 reviewer subagents: no blockers. Fixed:

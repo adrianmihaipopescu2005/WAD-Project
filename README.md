@@ -9,20 +9,29 @@ It's built for the **Web Application Design (WAD)** project. The WAD "software l
 spec is mapped onto absences (see [the mapping](#how-the-wad-requirements-map-onto-this-app)).
 
 **Stack:** Python 3.11, Flask 3, Flask-SQLAlchemy (SQLite), Flask-Login, Flask-WTF ·
-HTML, CSS, vanilla JavaScript, Bootstrap 5.3.
+HTML, CSS, vanilla JavaScript, Bootstrap 5.3 + Bootstrap Icons, Inter font.
+
+**Look:** a modern, clean dashboard with a **dark mode** toggle (follows your system setting until
+you choose), icons, and subtle animations that are turned off if you prefer reduced motion.
 
 ## Quick start
 
-From the `backend/` folder (Windows; on macOS/Linux use `.venv/bin/` instead of `.venv\Scripts\`):
+In **PowerShell**, from the project folder. Every `flask` command must be run **from `backend/`**
+and **with the `.\.venv\Scripts\` path**, because `flask` is installed only inside the virtual
+environment:
 
-```
+```powershell
+cd backend
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\flask --app app seed-demo          # demo data (or: init-db, see below)
-.venv\Scripts\flask --app app run --debug
+.\.venv\Scripts\pip install -r requirements.txt
+.\.venv\Scripts\flask --app app seed-demo          # demo data (or: init-db, see below)
+.\.venv\Scripts\flask --app app run --debug
 ```
 
-Then open <http://127.0.0.1:5000>.
+Then open <http://127.0.0.1:5000>. Keep that window open while you use the app, and stop it with
+`Ctrl+C`. On macOS/Linux, use `.venv/bin/flask` instead.
+
+Alternatively, run `.\.venv\Scripts\Activate.ps1` once per terminal, and plain `flask …` works.
 
 ### Demo accounts (`seed-demo`)
 
@@ -38,8 +47,8 @@ The demo absences are dated relative to the day you run the command.
 
 ### A real admin account instead
 
-```
-.venv\Scripts\flask --app app init-db --email you@example.com --name "Your Name" --password "…"
+```powershell
+.\.venv\Scripts\flask --app app init-db --email you@example.com --name "Your Name" --password "…"
 ```
 
 ### Configuration (environment variables)
@@ -119,10 +128,10 @@ key sees all students.
 
 ## Tests
 
-```
+```powershell
 cd backend
-.venv\Scripts\python -m pytest
-.venv\Scripts\python -m ruff check .
+.\.venv\Scripts\python -m pytest
+.\.venv\Scripts\python -m ruff check .
 ```
 
 There are 242 tests: models, auth, admin, students, absences, the public form, the API, the demo

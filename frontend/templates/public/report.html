@@ -10,13 +10,13 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-9 col-lg-7">
-    <h1 class="h3 mb-1">Report an absence</h1>
+    <h1 class="h3 mb-1"><i class="bi bi-send text-accent" aria-hidden="true"></i> Report an absence</h1>
     <p class="text-body-secondary">
       Mobile Systems and Applications lab · Tuesday and Thursday 18–20.
       Your lab assistant will see this report.
     </p>
 
-    <form method="post" novalidate id="report-form"
+    <form method="post" novalidate id="report-form" class="form-card"
           data-lookup-endpoint="{{ url_for('public.lookup') }}">
       {{ form.hidden_tag() }}
 

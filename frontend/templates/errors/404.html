@@ -3,7 +3,10 @@
 {% block title %}Not found · Lab Absence Manager{% endblock %}
 
 {% block content %}
+<div class="empty-state py-5">
+<i class="bi bi-signpost-split" aria-hidden="true"></i>
 <h1 class="h3">Page not found</h1>
 <p>The page you're looking for doesn't exist.</p>
 <a class="btn btn-outline-primary" href="{{ url_for('main.index') }}">Back to home</a>
+</div>
 {% endblock %}

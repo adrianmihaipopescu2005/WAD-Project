@@ -3,8 +3,11 @@
 {% block title %}{{ title }} · Lab Absence Manager{% endblock %}
 
 {% block content %}
+<div class="empty-state py-5">
+<i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
 <h1 class="h3">{{ title }}</h1>
 <p>{{ message }}</p>
 <p class="text-body-secondary small">Error {{ code }}</p>
 <a class="btn btn-outline-primary" href="{{ url_for('main.index') }}">Back to home</a>
+</div>
 {% endblock %}

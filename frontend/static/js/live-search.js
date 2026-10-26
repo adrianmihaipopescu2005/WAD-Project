@@ -34,6 +34,10 @@
       try {
         const data = await App.fetchJson(form.dataset.endpoint + qs, { signal: mine.signal });
         target.innerHTML = data.html;
+        // Restart the fade-in so each new result set appears gently.
+        target.classList.remove("lam-fade-in");
+        void target.offsetWidth;
+        target.classList.add("lam-fade-in");
         if (counter) counter.textContent = data.count;
         history.replaceState(null, "", location.pathname + qs);
       } catch (err) {

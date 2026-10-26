@@ -24,7 +24,10 @@
       row.outerHTML = data.html;
       // The focused button was replaced with the row; keep keyboard users on the same row.
       const newRow = document.getElementById(`absence-${data.absence.id}`);
-      if (newRow) newRow.focus();
+      if (newRow) {
+        newRow.classList.add("row-flash"); // brief highlight so the change is noticed
+        newRow.focus();
+      }
       App.showAlert(data.message, "success");
     } catch (err) {
       controls.forEach((el) => { el.disabled = false; });

@@ -1,7 +1,7 @@
 {#- Server-rendered result of the excused check (no-JS fallback). excused-check.js builds the
     same markup from the API's JSON. Needs: check (dict or None), check_error (str or None). -#}
 {% if check_error %}
-  <div class="alert alert-danger mb-0">{{ check_error }}</div>
+  <div class="alert alert-danger mb-0" data-result="error">{{ check_error }}</div>
 {% elif check %}
   {% if not check.lab_day %}
     <div class="alert alert-secondary mb-0" data-result="no-lab">

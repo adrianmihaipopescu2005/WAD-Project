@@ -3,20 +3,23 @@
 {% block title %}Absences · Lab Absence Manager{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h1 class="h3 mb-0">{{ "Absences" if current_user.is_admin else "My students' absences" }}</h1>
-  <a class="btn btn-primary" href="{{ url_for('absences.new') }}">Add absence</a>
+<div class="page-header">
+  <div>
+    <h1 class="h3">{{ "Absences" if current_user.is_admin else "My students' absences" }}</h1>
+    <p class="page-subtitle">Filter, extend or revoke. Changes apply instantly.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('absences.new') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add absence</a>
 </div>
 
 <form class="row g-2 mb-2" method="get" role="search"
       data-live-search data-endpoint="{{ url_for('absences.search') }}"
       data-target="#absence-results" data-count="#absence-count">
-  <div class="col-md">
+  <div class="col-12">
     <label class="visually-hidden" for="q">Search</label>
     <input class="form-control" type="search" id="q" name="q" value="{{ filters.q or '' }}"
            placeholder="Search by student name or number" autocomplete="off">
   </div>
-  <div class="col-sm-6 col-md-3">
+  <div class="col-sm-6 col-lg">
     <label class="visually-hidden" for="student">Student</label>
     <select class="form-select" id="student" name="student">
       <option value="">All students</option>
@@ -27,7 +30,7 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-lg">
     <label class="visually-hidden" for="status">Status</label>
     <select class="form-select" id="status" name="status">
       <option value="">Any status</option>
@@ -35,7 +38,7 @@
       <option value="revoked" {{ "selected" if filters.status == "revoked" }}>Revoked</option>
     </select>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-lg">
     <label class="visually-hidden" for="slot">Slot</label>
     <select class="form-select" id="slot" name="slot">
       <option value="">Any slot</option>
@@ -45,7 +48,7 @@
     </select>
   </div>
   {% if current_user.is_admin %}
-    <div class="col-sm-6 col-md-3">
+    <div class="col-sm-6 col-lg">
       <label class="visually-hidden" for="assistant">Lab assistant</label>
       <select class="form-select" id="assistant" name="assistant">
         <option value="">All lab assistants</option>
@@ -56,7 +59,7 @@
     </div>
   {% endif %}
   <div class="col-auto">
-    <button class="btn btn-outline-primary" type="submit">Filter</button>
+    <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> Filter</button>
     <a class="btn btn-link" href="{{ url_for('absences.index') }}">Clear</a>
   </div>
 </form>

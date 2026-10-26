@@ -6,10 +6,10 @@
 <div class="row justify-content-center">
   <div class="col-md-8 col-lg-6">
     <div class="alert alert-success" role="status">
-      <h1 class="h4 alert-heading">Absence reported</h1>
+      <h1 class="h4 alert-heading"><i class="bi bi-check-circle" aria-hidden="true"></i> Absence reported</h1>
       <p class="mb-0">Thanks ({{ summary.initials }})! Your lab assistant can now see it.</p>
     </div>
-    <dl class="row">
+    <dl class="row form-card mx-0">
       <dt class="col-sm-4">Lab slot</dt><dd class="col-sm-8">{{ summary.slot }}</dd>
       <dt class="col-sm-4">From</dt><dd class="col-sm-8">{{ summary.start }}</dd>
       <dt class="col-sm-4">Until</dt><dd class="col-sm-8">{{ summary.end }}</dd>

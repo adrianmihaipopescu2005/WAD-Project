@@ -3,9 +3,12 @@
 {% block title %}Students · Lab Absence Manager{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h1 class="h3 mb-0">{{ "Students" if current_user.is_admin else "My students" }}</h1>
-  <a class="btn btn-primary" href="{{ url_for('students.new') }}">Add student</a>
+<div class="page-header">
+  <div>
+    <h1 class="h3">{{ "Students" if current_user.is_admin else "My students" }}</h1>
+    <p class="page-subtitle">Search by name or student number. Results update as you type.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('students.new') }}"><i class="bi bi-person-plus" aria-hidden="true"></i> Add student</a>
 </div>
 
 <form class="row g-2 mb-2" method="get" role="search"
@@ -28,7 +31,7 @@
     </div>
   {% endif %}
   <div class="col-auto">
-    <button class="btn btn-outline-primary" type="submit">Filter</button>
+    <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> Filter</button>
     <a class="btn btn-link" href="{{ url_for('students.index') }}">Clear</a>
   </div>
 </form>

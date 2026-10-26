@@ -48,6 +48,8 @@ Updated: 2026-10-26. The full plan and the per-milestone log are in `MILESTONES.
   - **All 4 dynamic features checked in Chrome**: they work, with no reload and no console errors.
   - 242 tests pass.
 
+- **Restyle (after M8):** "modern clean" theme, dark mode toggle, icons, new home page, subtle animations. Checked in Chrome.
+
 ## Next (optional)
 - Screenshots in the README (not added yet).
 - Anything the course or the lab assistant asks for after a demo.

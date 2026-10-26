@@ -1,9 +1,7 @@
 {#- Students table or empty state. Rendered by the page and by the live-search JSON endpoint.
     Needs: students (rows of (Student, active_count)), filtered. -#}
 {% if not students %}
-  <div class="alert alert-secondary">
-    {% if filtered %}No students match this filter.{% else %}No students yet.{% endif %}
-  </div>
+  <div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><p>{% if filtered %}No students match this filter.{% else %}No students yet.{% endif %}</p></div>
 {% else %}
   <div class="table-responsive">
     <table class="table table-hover align-middle">

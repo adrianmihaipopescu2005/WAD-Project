@@ -9,16 +9,16 @@
       <div class="small text-body-secondary">{{ a.student.student_number }}</div>
     </td>
   {% endif %}
-  <td>{{ a.slot_label }}</td>
-  <td>{{ a.start_date.isoformat() }}</td>
-  <td data-field="end_date">{{ a.end_date.isoformat() }}</td>
+  <td class="text-nowrap">{{ a.slot_label }}</td>
+  <td class="text-nowrap">{{ a.start_date.isoformat() }}</td>
+  <td class="text-nowrap" data-field="end_date">{{ a.end_date.isoformat() }}</td>
   <td class="text-end" data-field="sessions">{{ a.sessions_count }}</td>
   <td class="text-break">{{ a.reason }}</td>
   <td>{{ source_label(a) }}</td>
   <td>{{ status_badge(a) }}</td>
   <td class="text-end">
     {% if a.status == "active" %}
-      <div class="d-flex flex-wrap justify-content-end gap-1">
+      <div class="d-flex flex-nowrap justify-content-end gap-1">
         <form class="js-absence-action d-flex gap-1" method="post"
               action="{{ url_for('absences.extend', absence_id=a.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -29,7 +29,7 @@
                  id="extend-{{ a.id }}" name="sessions" value="1" min="1" max="{{ max_extra }}"
                  {{ "disabled" if max_extra < 1 }} required>
           <button type="submit" class="btn btn-outline-primary btn-sm"
-                  {{ "disabled" if max_extra < 1 }}>Extend</button>
+                  {{ "disabled" if max_extra < 1 }}><i class="bi bi-calendar-plus" aria-hidden="true"></i> Extend</button>
         </form>
         <form class="js-absence-action" method="post"
               action="{{ url_for('absences.revoke', absence_id=a.id) }}"
@@ -37,7 +37,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="next" value="{{ next_url }}">
           <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">
-          <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+          <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle" aria-hidden="true"></i> Revoke</button>
         </form>
       </div>
     {% else %}

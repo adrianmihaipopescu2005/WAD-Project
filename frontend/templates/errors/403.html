@@ -3,7 +3,10 @@
 {% block title %}Access denied · Lab Absence Manager{% endblock %}
 
 {% block content %}
+<div class="empty-state py-5">
+<i class="bi bi-shield-lock" aria-hidden="true"></i>
 <h1 class="h3">Access denied</h1>
 <p>You don't have permission to view this page.</p>
 <a class="btn btn-outline-primary" href="{{ url_for('main.index') }}">Back to home</a>
+</div>
 {% endblock %}

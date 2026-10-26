@@ -13,7 +13,7 @@
       </ol>
     </nav>
     <h1 class="h3 mb-3">Add lab assistant</h1>
-    <form method="post" novalidate>
+    <form method="post" novalidate class="form-card">
       {{ form.hidden_tag() }}
       {{ render_field(form.name, autocomplete="off") }}
       {{ render_field(form.email, autocomplete="off") }}
