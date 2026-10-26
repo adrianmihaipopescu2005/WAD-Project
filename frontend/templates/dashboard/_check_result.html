@@ -1,0 +1,20 @@
+{#- Server-rendered result of the excused check (no-JS fallback). excused-check.js builds the
+    same markup from the API's JSON. Needs: check (dict or None), check_error (str or None). -#}
+{% if check_error %}
+  <div class="alert alert-danger mb-0">{{ check_error }}</div>
+{% elif check %}
+  {% if not check.lab_day %}
+    <div class="alert alert-secondary mb-0" data-result="no-lab">
+      No lab session on {{ check.date }}. Labs are on Tuesdays and Thursdays.
+    </div>
+  {% elif check.excused %}
+    <div class="alert alert-success mb-0" data-result="excused">
+      <strong>✓ Excused.</strong> {{ check.student_number }} on {{ check.date }} ({{ check.slot_label }}),
+      covered by absence #{{ check.absence_id }} until {{ check.until }}.
+    </div>
+  {% else %}
+    <div class="alert alert-warning mb-0" data-result="not-excused">
+      <strong>✗ Not excused.</strong> {{ check.student_number }} on {{ check.date }} ({{ check.slot_label }}).
+    </div>
+  {% endif %}
+{% endif %}

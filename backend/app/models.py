@@ -45,6 +45,10 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
 
     students = db.relationship("Student", back_populates="assistant")
+    api_key = db.relationship(
+        "ApiKey", back_populates="user", uselist=False,
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -136,3 +140,19 @@ class Absence(db.Model):
             return False
         weeks = (day - self.start_date).days // 7
         return 0 <= weeks < self.sessions_count
+
+
+class ApiKey(db.Model):
+    """A user's key for the validation API. Only a SHA-256 hash of the key is stored."""
+
+    __tablename__ = "api_keys"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    key_hash = db.Column(db.String(64), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
+    last_used_at = db.Column(db.DateTime(timezone=True))
+
+    user = db.relationship("User", back_populates="api_key")

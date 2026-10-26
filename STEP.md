@@ -3,7 +3,7 @@
 Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M6: Public absence form.** Done and pushed. Next up is **M7: Validation API + excused-check widget**.
+**M7: Validation API.** Done and pushed. Next up is **M8: Polish + submission**.
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -36,13 +36,18 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
   - **Dynamic smart form:** weekday check plus a "next session" shortcut, a live "covered until" date, and a student lookup (initials and group only).
   - 177 tests pass. The JS hasn't been tried in a real browser yet.
 
+- **M7:**
+  - `GET /api/v1/validate` with an API key (hashed, shown once, rotate/revoke) or a session. Scoped per assistant (others give 404).
+  - API key page with a curl example.
+  - **Dynamic excused-check widget** on the dashboard (no-JS fallback).
+  - 211 tests pass.
+
 ## Next
-1. **M7: Validation API (WAD "license validation").**
-   - `api` blueprint `GET /api/v1/validate?student_number=…&date=YYYY-MM-DD`. JSON `{excused, student_number, date, slot, absence_id, until}`, with 400 on bad or missing params and CSRF-exempt GET.
-   - Decide: is it public, or does it need a login or API key? (It reveals whether a student is excused, which is less sensitive than names.) **Ask the user.**
-   - **Dynamic excused-check widget** on the dashboard: student number + date, the result shown instantly through `fetch`.
-   - Tests: covered vs not covered (week, weekday, revoked), unknown student, bad params.
-2. **M8:** polish (demo seed data, README, a manual browser check of every dynamic feature).
+1. **M8: Polish + submission.**
+   - `flask seed-demo` command: demo admin, assistants, students and absences, for a quick demo.
+   - **Manual browser check of all 4 dynamic features** (not done yet).
+   - README: what the app is, the WAD mapping, setup/run, screenshots, API docs.
+   - Run the be-/fe- reviewer subagents for a final review.
 
 ## Blocked / open questions
 - None right now.

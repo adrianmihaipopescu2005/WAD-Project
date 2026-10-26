@@ -12,7 +12,7 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
   - Dynamic: **revoke/extend in place** (fetch, no reload) and **live search** on the absences and students pages.
 - [x] **M6: Public absence form.** Students report a Tue/Thu 18–20 absence with a reason, without logging in.
   - Dynamic: **smart form** (only valid weekdays, live "covered until" date, student number lookup).
-- [ ] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
+- [x] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
   - Dynamic: **excused-check widget** calling the API.
 - [ ] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
@@ -20,6 +20,17 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M7: Validation API + excused-check widget (2026-10-26)
+- `GET /api/v1/validate?student_number=…&date=YYYY-MM-DD` (`api` blueprint, `services/validation.py`). Returns `{student_number, date, lab_day, slot, slot_label, excused, absence_id, until}`. Errors are 400/401/404/405 as `{"error"}`.
+- Access (decision of 2026-10-26): an **API key** in `X-API-Key`, or the staff login session.
+  - Keys are `lam_…` and only their SHA-256 is stored, in the new `api_keys` table (FK CASCADE, one per user). `last_used_at` is recorded.
+  - The key is shown once (`Cache-Control: no-store`). Regenerating replaces the old key, and keys can be revoked.
+- Scoping: an assistant key sees only its own students. Others give the same 404 as an unknown number. An admin key sees all.
+- "API key" page `/account/api-key`: generate/revoke, status and last use, plus a curl example and the response format. Navbar link.
+- **Dynamic excused-check widget** on the dashboard (`static/js/excused-check.js`): calls the API with the session and renders the result (excused / not excused / no lab day / error) without a reload. Without JS, the GET form renders the same result server-side (`dashboard/_check_result.html`).
+- ADR `adr/backend/backend-validation-api.md`.
+- Tests: `test_api.py` (34 tests: auth, key hashing/rotation/revoke, scoping, covered weeks, revoked, other slot, non-lab day, bad params, key page, widget with and without JS). **211 passed** in total, ruff clean, `node --check` OK. The JS has **not yet been tested in a real browser**.
+
 ### M6: Public absence form + smart form (2026-10-26)
 - `public` blueprint (no login, CSRF on):
   - `GET/POST /report/`: student number, slot, first missed date, sessions, reason.

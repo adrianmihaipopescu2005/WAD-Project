@@ -36,6 +36,10 @@
               <a class="nav-link {{ 'active' if request.blueprint == 'absences' }}"
                  href="{{ url_for('absences.index') }}">Absences</a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if request.endpoint in ('auth.api_key', 'auth.generate_api_key') }}"
+                 href="{{ url_for('auth.api_key') }}">API key</a>
+            </li>
             {% if current_user.is_admin %}
               <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.blueprint == 'admin' }}"

@@ -1,6 +1,9 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from flask_wtf import FlaskForm
 
+from ...decorators import staff_required
+from ...services import validation
 from ...services.auth import authenticate, safe_next_url
 from .forms import LoginForm, LogoutForm
 
@@ -30,3 +33,30 @@ def logout():
         logout_user()
         flash("You have been logged out.", "info")
     return redirect(url_for("main.index"))
+
+
+@bp.get("/account/api-key")
+@staff_required
+def api_key():
+    return render_template("account/api_key.html", new_key=None, form=FlaskForm())
+
+
+@bp.post("/account/api-key")
+@staff_required
+def generate_api_key():
+    # Shown on this response only; it's stored hashed and can't be shown again.
+    new_key = validation.generate_key(current_user)
+    flash("New API key created. Copy it now: it won't be shown again.", "warning")
+    response = make_response(
+        render_template("account/api_key.html", new_key=new_key, form=FlaskForm())
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@bp.post("/account/api-key/revoke")
+@staff_required
+def revoke_api_key():
+    validation.revoke_key(current_user)
+    flash("API key revoked.", "info")
+    return redirect(url_for("auth.api_key"))
