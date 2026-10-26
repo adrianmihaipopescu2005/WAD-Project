@@ -1,5 +1,10 @@
+from sqlalchemy.exc import IntegrityError
+
 from ..extensions import db
 from ..models import STATUS_ACTIVE, Absence, Student
+from . import commit_or_rollback
+
+DUPLICATE_NUMBER = "A student with this student number already exists."
 
 
 class StudentError(Exception):
@@ -13,12 +18,14 @@ def _visible_to(stmt, user):
 
 def search_clause(q):
     """WHERE clause matching a student's number, first, last or full name (case-insensitive)."""
-    pattern = f"%{q.strip()}%"
+    # Escape LIKE wildcards so "%" and "_" in the search box match literally.
+    term = q.strip().replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{term}%"
     return db.or_(
-        Student.student_number.ilike(pattern),
-        Student.first_name.ilike(pattern),
-        Student.last_name.ilike(pattern),
-        (Student.first_name + " " + Student.last_name).ilike(pattern),
+        Student.student_number.ilike(pattern, escape="\\"),
+        Student.first_name.ilike(pattern, escape="\\"),
+        Student.last_name.ilike(pattern, escape="\\"),
+        (Student.first_name + " " + Student.last_name).ilike(pattern, escape="\\"),
     )
 
 
@@ -65,28 +72,36 @@ def _apply(student, data):
     student.study_group = (data.get("study_group") or "").strip() or None
 
 
+def _commit_unique():
+    """Commit; a UNIQUE race (two saves of the same number at once) becomes a form error."""
+    try:
+        commit_or_rollback()
+    except IntegrityError:
+        raise StudentError(DUPLICATE_NUMBER) from None
+
+
 def create_student(assistant_id, data):
     if _number_taken(data["student_number"].strip()):
-        raise StudentError("A student with this student number already exists.")
+        raise StudentError(DUPLICATE_NUMBER)
     student = Student(assistant_id=assistant_id)
     _apply(student, data)
     db.session.add(student)
-    db.session.commit()
+    _commit_unique()
     return student
 
 
 def update_student(student, data, assistant_id=None):
     """`assistant_id` reassigns the student (admins only; the route enforces that)."""
     if _number_taken(data["student_number"].strip(), exclude_id=student.id):
-        raise StudentError("A student with this student number already exists.")
+        raise StudentError(DUPLICATE_NUMBER)
     _apply(student, data)
     if assistant_id is not None:
         student.assistant_id = assistant_id
-    db.session.commit()
+    _commit_unique()
     return student
 
 
 def delete_student(student):
     """Delete the student. Their absences are deleted with them (FK ON DELETE CASCADE)."""
     db.session.delete(student)
-    db.session.commit()
+    commit_or_rollback()

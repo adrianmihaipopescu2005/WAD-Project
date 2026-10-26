@@ -1,9 +1,12 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import contains_eager
 
+from .. import clock
 from ..extensions import db
 from ..models import (
+    DAYS_AHEAD,
+    DAYS_BACK,
     MAX_SESSIONS,
     SLOTS,
     SOURCE_ASSISTANT,
@@ -13,7 +16,14 @@ from ..models import (
     Absence,
     Student,
 )
+from . import commit_or_rollback
 from .students import search_clause
+
+# Deliberately vague: it must not reveal whether a student is already absent on a date.
+DUPLICATE_PUBLIC_MESSAGE = (
+    "This report couldn't be recorded. If you already reported these sessions, there's nothing "
+    "more to do. Otherwise, contact your lab assistant."
+)
 
 
 class AbsenceError(Exception):
@@ -24,13 +34,25 @@ class AbsenceError(Exception):
         self.status = status
 
 
+def date_window():
+    """The (earliest, latest) allowed start date of an absence."""
+    today = clock.today()
+    return today - timedelta(days=DAYS_BACK), today + timedelta(days=DAYS_AHEAD)
+
+
 def slot_date_error(slot, day):
-    """An error message if `day` isn't on `slot`'s weekday, else None."""
+    """An error message if `day` isn't on `slot`'s weekday or is outside the window, else None."""
     if slot not in SLOTS:
         return "Choose a lab slot."
     label, weekday = SLOTS[slot]
     if day.weekday() != weekday:
         return f"{day.isoformat()} is not a {label.split()[0]}. Pick a date on the slot's day."
+    earliest, latest = date_window()
+    if not earliest <= day <= latest:
+        return (
+            f"Pick a date between {earliest.isoformat()} and {latest.isoformat()}"
+            f" (at most {DAYS_BACK} days ago and about 6 months ahead)."
+        )
     return None
 
 
@@ -77,7 +99,7 @@ def create_absence(student, slot, start_date, sessions_count, reason, source=SOU
         sessions_count=sessions_count, reason=reason, source=source,
     )
     db.session.add(absence)
-    db.session.commit()
+    commit_or_rollback()
     return absence
 
 
@@ -87,7 +109,7 @@ def revoke(absence):
         raise AbsenceError("This absence is already revoked.")
     absence.status = STATUS_REVOKED
     absence.revoked_at = datetime.now(UTC)
-    db.session.commit()
+    commit_or_rollback()
 
 
 def extend(absence, extra_sessions):
@@ -99,7 +121,7 @@ def extend(absence, extra_sessions):
     if absence.sessions_count + extra_sessions > MAX_SESSIONS:
         raise AbsenceError(f"An absence can cover at most {MAX_SESSIONS} sessions.", 400)
     absence.sessions_count += extra_sessions
-    db.session.commit()
+    commit_or_rollback()
 
 
 # --- public (no login) ---------------------------------------------------------------
@@ -122,18 +144,22 @@ def public_lookup(student_number):
     return {"found": True, "initials": initials, "group": student.study_group}
 
 
-def _covering_absence(student, slot, day):
+def _overlaps_active(student, slot, start_date, sessions_count):
+    """True if any session in the new range is already covered by an active absence."""
+    days = [start_date + timedelta(weeks=i) for i in range(sessions_count)]
     stmt = db.select(Absence).where(
         Absence.student_id == student.id, Absence.slot == slot, Absence.status == STATUS_ACTIVE
     )
-    return next((a for a in db.session.execute(stmt).scalars() if a.covers(day)), None)
+    return any(a.covers(day) for a in db.session.execute(stmt).scalars() for day in days)
 
 
 def submit_public(student_number, slot, start_date, sessions_count, reason):
     """A student's own report. It goes to the assistant who registered their student number."""
     student = find_student_by_number(student_number)
     if student is None:
-        raise AbsenceError("Student number not found. Contact your lab assistant.", 404)
-    if slot in SLOTS and _covering_absence(student, slot, start_date):
-        raise AbsenceError("You already reported an absence for this session.")
+        raise AbsenceError("Student number not found, contact your lab assistant.", 404)
+    if slot in SLOTS and 1 <= sessions_count <= MAX_SESSIONS and _overlaps_active(
+        student, slot, start_date, sessions_count
+    ):
+        raise AbsenceError(DUPLICATE_PUBLIC_MESSAGE)
     return create_absence(student, slot, start_date, sessions_count, reason, SOURCE_PUBLIC)

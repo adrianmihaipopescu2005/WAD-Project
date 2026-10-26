@@ -23,28 +23,20 @@
       </button>
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav me-auto">
+          {% macro nav_link(href, label, is_active) %}
+            <li class="nav-item">
+              <a class="nav-link{{ ' active' if is_active }}" href="{{ href }}"
+                 {% if is_active %}aria-current="page"{% endif %}>{{ label }}</a>
+            </li>
+          {% endmacro %}
           {% if current_user.is_authenticated %}
-            <li class="nav-item">
-              <a class="nav-link {{ 'active' if request.endpoint == 'dashboard.index' }}"
-                 href="{{ url_for('dashboard.index') }}">Dashboard</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {{ 'active' if request.blueprint == 'students' }}"
-                 href="{{ url_for('students.index') }}">Students</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {{ 'active' if request.blueprint == 'absences' }}"
-                 href="{{ url_for('absences.index') }}">Absences</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {{ 'active' if request.endpoint in ('auth.api_key', 'auth.generate_api_key') }}"
-                 href="{{ url_for('auth.api_key') }}">API key</a>
-            </li>
+            {{ nav_link(url_for('dashboard.index'), "Dashboard", request.endpoint == 'dashboard.index') }}
+            {{ nav_link(url_for('students.index'), "Students", request.blueprint == 'students') }}
+            {{ nav_link(url_for('absences.index'), "Absences", request.blueprint == 'absences') }}
+            {{ nav_link(url_for('auth.api_key'), "API key",
+                        request.endpoint in ('auth.api_key', 'auth.generate_api_key')) }}
             {% if current_user.is_admin %}
-              <li class="nav-item">
-                <a class="nav-link {{ 'active' if request.blueprint == 'admin' }}"
-                   href="{{ url_for('admin.assistants') }}">Assistants</a>
-              </li>
+              {{ nav_link(url_for('admin.assistants'), "Assistants", request.blueprint == 'admin') }}
             {% endif %}
           {% endif %}
           {% block nav_items %}{% endblock %}
@@ -55,7 +47,7 @@
             <span class="badge text-bg-light ms-1">{{ current_user.role }}</span>
           </span>
           <form method="post" action="{{ url_for('auth.logout') }}" class="d-flex">
-            {{ logout_form.hidden_tag() }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
           </form>
         {% else %}

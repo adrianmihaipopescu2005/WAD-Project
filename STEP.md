@@ -1,9 +1,9 @@
 # STEP: current progress
 
-Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.md`.
+Updated: 2026-10-26. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M7: Validation API.** Done and pushed. Next up is **M8: Polish + submission**.
+**M8: Polish + submission.** Done and pushed. **All milestones M0–M8 are complete.**
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -41,13 +41,16 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
   - API key page with a curl example.
   - **Dynamic excused-check widget** on the dashboard (no-JS fallback).
   - 211 tests pass.
+- **M8:**
+  - `flask seed-demo`, plus a README.
+  - Final review by the 4 reviewer subagents. Every finding is fixed or recorded as accepted.
+  - Date window of 30 days back to 6 months ahead, and per-IP rate limit on the public pages.
+  - **All 4 dynamic features checked in Chrome**: they work, with no reload and no console errors.
+  - 242 tests pass.
 
-## Next
-1. **M8: Polish + submission.**
-   - `flask seed-demo` command: demo admin, assistants, students and absences, for a quick demo.
-   - **Manual browser check of all 4 dynamic features** (not done yet).
-   - README: what the app is, the WAD mapping, setup/run, screenshots, API docs.
-   - Run the be-/fe- reviewer subagents for a final review.
+## Next (optional)
+- Screenshots in the README (not added yet).
+- Anything the course or the lab assistant asks for after a demo.
 
 ## Blocked / open questions
 - None right now.
@@ -61,13 +64,16 @@ Updated: 2026-10-23. The full plan and the per-milestone log are in `MILESTONES.
 - Public form (decided 2026-10-26): matched by student number to the registered student and their assistant. Unknown numbers are rejected, and the form never creates students. The lookup shows initials and group only.
 - Templates/static live in `frontend/`, and the Flask app in `backend/app/`.
 - Removing an assistant reassigns their students to another assistant chosen by the admin (decided 2026-10-23). The DB keeps `ON DELETE RESTRICT` as a safety net.
+- Date window (decided 2026-10-26): an absence starts at most 30 days back and about 6 months ahead.
+- Public pages: an in-memory per-IP rate limit and a generic duplicate message (decided 2026-10-26).
+- Validation API access: an API key, hashed and shown once (decided 2026-10-26).
 - Deleting a student also deletes their absences (CASCADE). Revoking an absence never deletes it.
 
 ## How to run (from `backend/`)
 ```
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\flask --app app init-db
+.venv\Scripts\flask --app app seed-demo      # or: init-db for a real admin
 .venv\Scripts\flask --app app run --debug
 .venv\Scripts\python -m pytest
 ```

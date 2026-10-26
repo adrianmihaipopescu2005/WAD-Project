@@ -14,12 +14,33 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
   - Dynamic: **smart form** (only valid weekdays, live "covered until" date, student number lookup).
 - [x] **M7: Validation API.** `GET /api/v1/validate?student_number=…&date=…`.
   - Dynamic: **excused-check widget** calling the API.
-- [ ] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
+- [x] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
 ## Open questions
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M8: Polish, review fixes, browser check (2026-10-26)
+- **`flask seed-demo`** (`app/seed.py`): an admin, 2 assistants, 7 students and 6 absences, dated relative to today, in one transaction. It only fills an empty database. `--reset` asks first.
+- **Final review** by the 4 reviewer subagents: no blockers. Fixed:
+  - Absence date window (user decision): 30 days back to 183 days ahead, on both forms and in the service. This fixes a year-9999 date that crashed staff pages. "Today" comes from `app/clock.py`, which the tests pin to 2026-10-26.
+  - Public abuse (user decision): an in-memory per-IP rate limit (`app/ratelimit.py`, 30 lookups and 10 report POSTs per minute) and a generic duplicate message. The public overlap check now covers the whole new range.
+  - No public fallback `SECRET_KEY`: a dev key only in debug/testing, otherwise a random key plus a warning. `COOKIE_SECURE` env flag.
+  - Errors: a generic error page for 400/405/429/500. `/api/` always answers JSON, and a fetch with an expired session gets a JSON 401.
+  - `commit_or_rollback()` on every write. `generate_key` rolls back and keeps the old key. UNIQUE races become form errors.
+  - Login checks a dummy hash for unknown emails (same timing). `last_used_at` is written at most once a minute. `parse_day` accepts only `YYYY-MM-DD`. Search escapes LIKE wildcards.
+  - JS: server date errors stay visible with the smart form. Lookup results are never stale. Revoke/extend only re-enables controls that were enabled, and focus moves to the updated row. Live search keeps `aria-busy` correct.
+  - Templates: confirmation modals for regenerating/revoking an API key, `aria-live` result counters, `aria-current` in the navbar, `aria-describedby`/`aria-invalid` on the date field, no duplicate `id="csrf_token"`, an inline style moved to `app.css`, `min`/`max` on the date pickers, and the student-form select uses the macro.
+  - Reviewer notes left as they are: fragments and macros don't extend `base.html` (intended); templates use `is_admin`, which means `role == 'admin'`; a duplicate student number reveals that the number exists (needed for uniqueness).
+- **Browser check (Chrome) of all 4 dynamic features, all working with no page reload and no console errors:**
+  - Smart form: weekday error, "Use Tuesday" shortcut, live coverage, lookup found/not found/cleared, real submission.
+  - Live search on absences and students.
+  - Extend and revoke in place, with an alert and focus kept.
+  - Excused widget: excused, not excused, no lab day, and another assistant's student showing "not found".
+  - Fixed "Thanks, B. M.." (double period) found during the check.
+- **README.md**: quick start, demo accounts, configuration, WAD mapping, dynamic features, API docs, rules, tests, layout, known limitations.
+- Tests: `test_seed.py` (4) and `test_hardening.py` (27). **242 passed** in total, ruff clean, `node --check` OK.
+
 ### M7: Validation API + excused-check widget (2026-10-26)
 - `GET /api/v1/validate?student_number=…&date=YYYY-MM-DD` (`api` blueprint, `services/validation.py`). Returns `{student_number, date, lab_day, slot, slot_label, excused, absence_id, until}`. Errors are 400/401/404/405 as `{"error"}`.
 - Access (decision of 2026-10-26): an **API key** in `X-API-Key`, or the staff login session.

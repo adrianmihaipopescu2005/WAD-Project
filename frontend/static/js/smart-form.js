@@ -62,7 +62,11 @@
       message = `${isoDate(date)} is not a ${dayName}. Pick a ${dayName}.`;
     }
     dateInput.setCustomValidity(message);
-    dateInput.classList.toggle("is-invalid", Boolean(message));
+    // Keep the field marked invalid while a server error (e.g. outside the date window) is shown.
+    const serverError = Boolean(dateInput.parentElement.querySelector("[data-server-error]"));
+    const invalid = Boolean(message) || serverError;
+    dateInput.classList.toggle("is-invalid", invalid);
+    dateInput.setAttribute("aria-invalid", String(invalid));
     dateError.textContent = message;
     dateError.hidden = !message;
 
@@ -115,13 +119,12 @@
 
   async function lookup() {
     const number = numberInput.value.trim();
+    if (lookupController) lookupController.abort(); // an older answer must never show up
     if (!number) {
       setLookup("", "");
       return;
     }
-    if (lookupController) lookupController.abort();
     lookupController = new AbortController();
-    setLookup("Checking…", "text-body-secondary");
     try {
       const url = `${form.dataset.lookupEndpoint}?student_number=${encodeURIComponent(number)}`;
       const data = await App.fetchJson(url, { signal: lookupController.signal });
@@ -139,6 +142,8 @@
   numberInput.addEventListener("input", () => {
     clearServerErrors(numberInput);
     numberInput.classList.remove("is-invalid");
+    // Clear the previous number's result right away, not only after the debounce.
+    setLookup(numberInput.value.trim() ? "Checking…" : "", "text-body-secondary");
     clearTimeout(lookupTimer);
     lookupTimer = setTimeout(lookup, LOOKUP_DEBOUNCE_MS);
   });

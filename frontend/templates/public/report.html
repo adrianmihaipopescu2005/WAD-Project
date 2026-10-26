@@ -44,8 +44,10 @@
         </div>
         <div class="col-sm-6 mb-3">
           {{ form.start_date.label(class="form-label") }}
+          {% set earliest, latest = date_window() %}
           {{ form.start_date(class="form-control" ~ (" is-invalid" if form.start_date.errors else ""),
-                             type="date", **{"aria-describedby": "start_date-help"}) }}
+                             type="date", min=earliest.isoformat(), max=latest.isoformat(),
+                             **{"aria-describedby": "start_date-help start_date-js-error"}) }}
           {{ errors(form.start_date) }}
           <div class="invalid-feedback" id="start_date-js-error" hidden></div>
           <div id="start_date-help" class="form-text">

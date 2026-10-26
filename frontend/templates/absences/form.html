@@ -18,7 +18,10 @@
       {{ render_field(form.student_id) }}
       <div class="row">
         <div class="col-sm-6">{{ render_field(form.slot) }}</div>
-        <div class="col-sm-6">{{ render_field(form.start_date) }}</div>
+        {% set earliest, latest = date_window() %}
+        <div class="col-sm-6">
+          {{ render_field(form.start_date, min=earliest.isoformat(), max=latest.isoformat()) }}
+        </div>
       </div>
       {{ render_field(form.sessions_count, min=1, max=max_sessions) }}
       {{ render_field(form.reason, rows=3, maxlength=500) }}

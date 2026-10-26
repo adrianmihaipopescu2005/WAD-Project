@@ -14,6 +14,7 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 - An assistant sees and changes **only** their own students and those students' absences. An admin sees and changes everything.
 - Only an admin can add or remove assistants.
 - `absences.slot` is one of `TUE_18_20`, `THU_18_20`, and `start_date` falls on that slot's weekday.
+- `start_date` is at most 30 days back and 183 days ahead of today (`DAYS_BACK`/`DAYS_AHEAD`, read through `app/clock.py` so tests can pin "today").
 - `absences.sessions_count >= 1`. "Extend" increases it, so the absence covers the next weekly sessions of the same slot.
 - `absences.status` is `active` or `revoked`. "Revoke" sets `revoked` and is never a hard delete.
 - Every role check is enforced server-side, not just hidden in the UI.

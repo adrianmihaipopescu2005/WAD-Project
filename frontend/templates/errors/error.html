@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<h1 class="h3">{{ title }}</h1>
+<p>{{ message }}</p>
+<p class="text-body-secondary small">Error {{ code }}</p>
+<a class="btn btn-outline-primary" href="{{ url_for('main.index') }}">Back to home</a>
+{% endblock %}

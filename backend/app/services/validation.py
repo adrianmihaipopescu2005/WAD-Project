@@ -1,14 +1,18 @@
 """License validation (WAD): is a student excused from the lab session on a given date?"""
 
 import hashlib
+import re
 import secrets
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from ..extensions import db
 from ..models import SLOTS, STATUS_ACTIVE, Absence, ApiKey
+from . import commit_or_rollback
 from .absences import find_student_by_number
 
 KEY_PREFIX = "lam_"
+LAST_USED_RESOLUTION = timedelta(minutes=1)
+DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 class ValidationError(Exception):
@@ -26,22 +30,26 @@ def _hash(raw_key):
 def generate_key(user):
     """Create (or replace) the user's key and return the raw key, which is never stored."""
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
-    if user.api_key is not None:
-        db.session.delete(user.api_key)
-        db.session.flush()
-    db.session.add(ApiKey(user=user, key_hash=_hash(raw)))
-    db.session.commit()
+    try:
+        if user.api_key is not None:
+            db.session.delete(user.api_key)
+            db.session.flush()  # free the unique user_id before inserting the new key
+        db.session.add(ApiKey(user=user, key_hash=_hash(raw)))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()  # the old key stays valid
+        raise
     return raw
 
 
 def revoke_key(user):
     if user.api_key is not None:
         db.session.delete(user.api_key)
-        db.session.commit()
+        commit_or_rollback()
 
 
 def user_for_key(raw_key):
-    """The key's owner (and its last use is recorded), or None for a missing or unknown key."""
+    """The key's owner, or None for a missing or unknown key. Records the last use."""
     if not raw_key:
         return None
     key = db.session.execute(
@@ -49,16 +57,34 @@ def user_for_key(raw_key):
     ).scalar_one_or_none()
     if key is None:
         return None
-    key.last_used_at = datetime.now(UTC)
-    db.session.commit()
+    _touch(key)
     return key.user
+
+
+def _touch(key):
+    """Update last_used_at at most once a minute, so every API call isn't a SQLite write."""
+    now = datetime.now(UTC)
+    last = key.last_used_at
+    if last is not None and last.tzinfo is None:  # SQLite returns naive datetimes
+        last = last.replace(tzinfo=UTC)
+    if last is not None and now - last < LAST_USED_RESOLUTION:
+        return
+    key.last_used_at = now
+    try:
+        commit_or_rollback()
+    except Exception:  # a lost timestamp is harmless; never fail the API call for it
+        pass
 
 
 # --- validation -----------------------------------------------------------------------
 
 def parse_day(value):
+    value = (value or "").strip()
+    # date.fromisoformat also accepts forms like "20261027" and "2026-W44-2". Only allow YYYY-MM-DD.
+    if not DATE_PATTERN.fullmatch(value):
+        raise ValidationError("date must be YYYY-MM-DD.")
     try:
-        return date.fromisoformat((value or "").strip())
+        return date.fromisoformat(value)
     except ValueError:
         raise ValidationError("date must be YYYY-MM-DD.") from None
 

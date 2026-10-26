@@ -1,1 +1,12 @@
 /* App-specific overrides on top of Bootstrap 5. */
+
+/* "Sessions to add" number box next to the Extend button in absence rows. */
+.extend-input {
+  width: 4.5rem;
+}
+
+/* Rows that receive focus after revoke/extend get a visible focus ring. */
+tr[tabindex="-1"]:focus {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}

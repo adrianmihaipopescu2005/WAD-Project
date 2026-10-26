@@ -18,6 +18,10 @@ SLOTS = {
 # One semester has 14 weekly sessions per slot.
 MAX_SESSIONS = 14
 
+# An absence may start at most this many days before / after today (decided 2026-10-26).
+DAYS_BACK = 30
+DAYS_AHEAD = 183
+
 STATUS_ACTIVE = "active"
 STATUS_REVOKED = "revoked"
 

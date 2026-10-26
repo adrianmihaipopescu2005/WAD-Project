@@ -15,12 +15,16 @@
 
     const row = form.closest("tr");
     const body = new FormData(form); // read before disabling: disabled inputs aren't sent
-    const controls = row.querySelectorAll("button, input");
+    // Only touch controls that are enabled now, so e.g. a maxed-out Extend stays disabled.
+    const controls = [...row.querySelectorAll("button, input")].filter((el) => !el.disabled);
     controls.forEach((el) => { el.disabled = true; });
 
     try {
       const data = await App.fetchJson(form.action, { method: "POST", body });
       row.outerHTML = data.html;
+      // The focused button was replaced with the row; keep keyboard users on the same row.
+      const newRow = document.getElementById(`absence-${data.absence.id}`);
+      if (newRow) newRow.focus();
       App.showAlert(data.message, "success");
     } catch (err) {
       controls.forEach((el) => { el.disabled = false; });

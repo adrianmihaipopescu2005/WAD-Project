@@ -28,13 +28,7 @@
       </div>
       {{ render_field(form.email, autocomplete="off") }}
       {{ render_field(form.study_group, autocomplete="off") }}
-      {% if form.assistant_id %}
-        <div class="mb-3">
-          {{ form.assistant_id.label(class="form-label") }}
-          {{ form.assistant_id(class="form-select" ~ (" is-invalid" if form.assistant_id.errors else "")) }}
-          {% for error in form.assistant_id.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-        </div>
-      {% endif %}
+      {% if form.assistant_id %}{{ render_field(form.assistant_id) }}{% endif %}
       <div class="d-flex gap-2">
         {{ form.submit(class="btn btn-primary") }}
         <a class="btn btn-outline-secondary"

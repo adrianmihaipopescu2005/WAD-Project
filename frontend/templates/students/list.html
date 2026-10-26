@@ -32,7 +32,7 @@
     <a class="btn btn-link" href="{{ url_for('students.index') }}">Clear</a>
   </div>
 </form>
-<p class="small text-body-secondary mb-3">
+<p class="small text-body-secondary mb-3" aria-live="polite">
   <span id="student-count">{{ students | length }}</span> result(s)
 </p>
 

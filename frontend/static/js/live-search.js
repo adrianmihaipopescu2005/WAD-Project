@@ -28,17 +28,19 @@
     async function run() {
       const qs = queryString(form);
       if (controller) controller.abort(); // only the latest request may update the page
-      controller = new AbortController();
+      const mine = new AbortController();
+      controller = mine;
       target.setAttribute("aria-busy", "true");
       try {
-        const data = await App.fetchJson(form.dataset.endpoint + qs, { signal: controller.signal });
+        const data = await App.fetchJson(form.dataset.endpoint + qs, { signal: mine.signal });
         target.innerHTML = data.html;
         if (counter) counter.textContent = data.count;
         history.replaceState(null, "", location.pathname + qs);
       } catch (err) {
         if (err.name !== "AbortError") App.showAlert(err.message, "danger");
       } finally {
-        target.removeAttribute("aria-busy");
+        // An aborted older request must not clear the busy state of the newer one.
+        if (controller === mine) target.removeAttribute("aria-busy");
       }
     }
 

@@ -2,7 +2,7 @@
     Needs: a (Absence), show_student (bool), next_url (where non-JS posts redirect back). -#}
 {% from "_macros/absences.html" import status_badge, source_label %}
 {% set max_extra = max_sessions - a.sessions_count %}
-<tr id="absence-{{ a.id }}" data-status="{{ a.status }}">
+<tr id="absence-{{ a.id }}" data-status="{{ a.status }}" tabindex="-1">
   {% if show_student %}
     <td>
       <a href="{{ url_for('students.profile', student_id=a.student.id) }}">{{ a.student.full_name }}</a>
@@ -25,7 +25,7 @@
           <input type="hidden" name="next" value="{{ next_url }}">
           <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">
           <label class="visually-hidden" for="extend-{{ a.id }}">Sessions to add</label>
-          <input class="form-control form-control-sm" style="width: 4.5rem" type="number"
+          <input class="form-control form-control-sm extend-input" type="number"
                  id="extend-{{ a.id }}" name="sessions" value="1" min="1" max="{{ max_extra }}"
                  {{ "disabled" if max_extra < 1 }} required>
           <button type="submit" class="btn btn-outline-primary btn-sm"

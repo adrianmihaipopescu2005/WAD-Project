@@ -1,9 +1,19 @@
+from datetime import date
+
 import pytest
 
-from app import create_app
+from app import clock, create_app
 from app.config import TestingConfig
 from app.extensions import db as _db
 from app.models import ROLE_ADMIN, ROLE_ASSISTANT, User
+
+TODAY = date(2026, 10, 26)  # a Monday; the tests' fixed dates are relative to it
+
+
+@pytest.fixture(autouse=True)
+def fixed_today(monkeypatch):
+    """Pin "today" so the absence date window doesn't make the tests expire."""
+    monkeypatch.setattr(clock, "today", lambda: TODAY)
 
 
 @pytest.fixture

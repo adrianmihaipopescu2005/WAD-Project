@@ -1,6 +1,11 @@
+from sqlalchemy.exc import IntegrityError
+
 from ..extensions import db
 from ..models import ROLE_ASSISTANT, Student, User
+from . import commit_or_rollback
 from .auth import normalize_email
+
+DUPLICATE_EMAIL = "A user with this email already exists."
 
 
 class AssistantError(Exception):
@@ -33,11 +38,14 @@ def email_taken(email):
 
 def create_assistant(name, email, password):
     if email_taken(email):
-        raise AssistantError("A user with this email already exists.")
+        raise AssistantError(DUPLICATE_EMAIL)
     user = User(name=name.strip(), email=normalize_email(email), role=ROLE_ASSISTANT)
     user.set_password(password)
     db.session.add(user)
-    db.session.commit()
+    try:
+        commit_or_rollback()
+    except IntegrityError:  # two admins adding the same email at once
+        raise AssistantError(DUPLICATE_EMAIL) from None
     return user
 
 

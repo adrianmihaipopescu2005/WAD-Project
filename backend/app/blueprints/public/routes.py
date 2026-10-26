@@ -1,6 +1,7 @@
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
 from ...models import SLOTS
+from ...ratelimit import rate_limit
 from ...services import absences as service
 from .forms import PublicAbsenceForm
 
@@ -8,6 +9,7 @@ bp = Blueprint("public", __name__, url_prefix="/report")
 
 
 @bp.route("/", methods=["GET", "POST"])
+@rate_limit("report", limit=10, methods=("POST",))
 def report():
     """Students report an absence without logging in."""
     form = PublicAbsenceForm()
@@ -42,6 +44,7 @@ def thanks():
 
 
 @bp.get("/lookup.json")
+@rate_limit("lookup", limit=30)
 def lookup():
     """Smart form: confirms a student number while typing. Reveals initials and group only."""
     return service.public_lookup(request.args.get("student_number", ""))

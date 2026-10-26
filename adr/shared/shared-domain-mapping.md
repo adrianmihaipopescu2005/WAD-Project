@@ -28,5 +28,8 @@ One app has to serve as the Mobile Systems and Applications lab-absence tool and
 
 - **Public-form routing (decided 2026-10-26):** a submission is matched by `student_number` against the registered students and goes to that student's assistant. Unknown numbers are rejected ("Student number not found, contact your lab assistant"). Public submissions never create students. They're stored with `source = 'public'`.
 
+- **Date window (decided 2026-10-26):** an absence may start at most 30 days in the past and about 6 months (183 days) ahead. This applies to both the staff form and the public form, and is enforced in the service.
+- **Public abuse limits (decided 2026-10-26):** an in-memory rate limit per IP (30 lookups and 10 report POSTs per minute, no extra dependency). The public "duplicate report" message is generic, so it doesn't reveal whether a student is already absent.
+
 ## Open questions
 - None.

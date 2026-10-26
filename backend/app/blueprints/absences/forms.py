@@ -17,7 +17,7 @@ class AbsenceFieldsForm(FlaskForm):
     start_date = DateField(
         "First missed session",
         validators=[DataRequired(message="Pick a date.")],
-        description="Must be on the slot's day (Tuesday or Thursday).",
+        description="On the slot's day (Tuesday or Thursday), from 30 days ago to 6 months ahead.",
     )
     sessions_count = IntegerField(
         "Sessions",

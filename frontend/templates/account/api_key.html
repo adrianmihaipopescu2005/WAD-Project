@@ -40,16 +40,16 @@
           <p><span class="badge text-bg-secondary">No key</span> You don't have an API key yet.</p>
         {% endif %}
         <div class="d-flex flex-wrap gap-2">
-          <form method="post" action="{{ url_for('auth.generate_api_key') }}">
-            {{ form.hidden_tag() }}
-            <button class="btn btn-primary" type="submit">
-              {{ "Generate a new key" if current_user.api_key else "Generate key" }}
-            </button>
-          </form>
           {% if current_user.api_key %}
-            <form method="post" action="{{ url_for('auth.revoke_api_key') }}">
-              {{ form.hidden_tag() }}
-              <button class="btn btn-outline-danger" type="submit">Revoke key</button>
+            {# Both replace or disable a key that programs may be using, so confirm first. #}
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal"
+                    data-bs-target="#confirm-regenerate">Generate a new key</button>
+            <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal"
+                    data-bs-target="#confirm-revoke">Revoke key</button>
+          {% else %}
+            <form method="post" action="{{ url_for('auth.generate_api_key') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-primary" type="submit">Generate key</button>
             </form>
           {% endif %}
         </div>
@@ -74,4 +74,32 @@
     </p>
   </div>
 </div>
+
+{% macro confirm_modal(id, title, body, action, button) %}
+  <div class="modal fade" id="{{ id }}" tabindex="-1" aria-labelledby="{{ id }}-title" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" method="post" action="{{ action }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="{{ id }}-title">{{ title }}</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">{{ body }}</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">{{ button }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endmacro %}
+
+{% if current_user.api_key %}
+  {{ confirm_modal("confirm-regenerate", "Generate a new key?",
+                   "Your current key stops working immediately. Programs using it need the new key.",
+                   url_for('auth.generate_api_key'), "Generate new key") }}
+  {{ confirm_modal("confirm-revoke", "Revoke your API key?",
+                   "Programs using this key will get 401 errors until you generate a new one.",
+                   url_for('auth.revoke_api_key'), "Revoke key") }}
+{% endif %}
 {% endblock %}

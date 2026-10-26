@@ -1,6 +1,5 @@
 from flask import Blueprint, flash, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
-from flask_wtf import FlaskForm
 
 from ...decorators import staff_required
 from ...services import validation
@@ -38,7 +37,7 @@ def logout():
 @bp.get("/account/api-key")
 @staff_required
 def api_key():
-    return render_template("account/api_key.html", new_key=None, form=FlaskForm())
+    return render_template("account/api_key.html", new_key=None)
 
 
 @bp.post("/account/api-key")
@@ -48,7 +47,7 @@ def generate_api_key():
     new_key = validation.generate_key(current_user)
     flash("New API key created. Copy it now: it won't be shown again.", "warning")
     response = make_response(
-        render_template("account/api_key.html", new_key=new_key, form=FlaskForm())
+        render_template("account/api_key.html", new_key=new_key)
     )
     response.headers["Cache-Control"] = "no-store"
     return response

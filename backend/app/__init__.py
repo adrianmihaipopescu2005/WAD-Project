@@ -1,11 +1,13 @@
+import secrets
 from pathlib import Path
 
 import click
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 from .config import Config
 from .extensions import csrf, db, login_manager
 from .models import MAX_SESSIONS, ROLE_ADMIN, User
+from .services.absences import date_window
 from .services.auth import normalize_email
 from .utils import wants_json
 
@@ -19,6 +21,7 @@ def create_app(config_class=Config):
         static_folder=str(FRONTEND_DIR / "static"),
     )
     app.config.from_object(config_class)
+    _ensure_secret_key(app)
 
     if not app.config["SQLALCHEMY_DATABASE_URI"]:
         Path(app.instance_path).mkdir(parents=True, exist_ok=True)
@@ -51,24 +54,50 @@ def create_app(config_class=Config):
     app.register_blueprint(public_bp)
     app.register_blueprint(api_bp)
 
-    # The navbar's logout button is a POST form on every page.
-    app.context_processor(lambda: {"logout_form": LogoutForm(), "max_sessions": MAX_SESSIONS})
+    # logout_form: the navbar's logout button is a POST form on every page.
+    # date_window: min/max for the date pickers (the server enforces the same window).
+    app.context_processor(lambda: {
+        "logout_form": LogoutForm(), "max_sessions": MAX_SESSIONS, "date_window": date_window,
+    })
 
     _register_error_handlers(app)
     _register_cli(app)
     return app
 
 
+def _ensure_secret_key(app):
+    """Never sign sessions with a public default key outside debug/testing."""
+    if app.config.get("SECRET_KEY"):
+        return
+    if app.debug or app.testing:
+        app.config["SECRET_KEY"] = "dev-only-insecure-key"
+    else:
+        app.config["SECRET_KEY"] = secrets.token_hex(32)
+        app.logger.warning("SECRET_KEY is not set: using a random key, so logins end on restart.")
+
+
+ERROR_TITLES = {
+    400: "Bad request",
+    405: "Method not allowed",
+    429: "Too many requests",
+    500: "Something went wrong",
+}
+
+
 def _register_error_handlers(app):
     def handle(e):
-        if wants_json():
+        # fetch() calls and every /api/ route get JSON errors.
+        if wants_json() or request.path.startswith("/api/"):
             return {"error": e.description}, e.code
         if e.code in (403, 404):
             return render_template(f"errors/{e.code}.html"), e.code
-        return e
+        return render_template(
+            "errors/error.html", code=e.code, title=ERROR_TITLES.get(e.code, "Error"),
+            message=e.description if e.code != 500 else "Please try again later.",
+        ), e.code
 
     # 400 also covers CSRFError (a BadRequest subclass).
-    for code in (400, 403, 404, 405):
+    for code in (400, 403, 404, 405, 429, 500):
         app.register_error_handler(code, handle)
 
 
@@ -94,3 +123,24 @@ def _register_cli(app):
         db.session.add(admin)
         db.session.commit()
         click.echo(f"Created admin {email}.")
+
+    @app.cli.command("seed-demo")
+    @click.option("--reset", is_flag=True, help="Delete ALL existing data first.")
+    def seed_demo_command(reset):
+        """Fill an empty database with demo users, students and absences."""
+        from .seed import ADMIN, ASSISTANTS, seed_demo
+
+        if reset:
+            click.confirm("This deletes ALL users, students and absences. Continue?", abort=True)
+            db.drop_all()
+        db.create_all()
+        if db.session.execute(db.select(User.id).limit(1)).first() is not None:
+            raise click.ClickException(
+                "The database already has users. Use --reset to replace everything with demo data."
+            )
+        seed_demo()
+        click.echo("Demo data created. Log in with:")
+        click.echo(f"  admin:     {ADMIN[0]} / {ADMIN[2]}")
+        for email, _name, password in ASSISTANTS:
+            click.echo(f"  assistant: {email} / {password}")
+        click.echo("Students for the public form: LM1001 … LM1004, LM2001 … LM2003")
