@@ -3,7 +3,7 @@
 Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M10: Decision emails.** Done locally, not committed yet. M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
+**M10: Decision emails.** Committed and pushed, not deployed yet. M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -61,7 +61,7 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
 
 ## Next
 - Try the new public form and the Motivated toggle in a browser.
-- Commit + push M10. On PythonAnywhere: pull, `flask --app app reset-absences`, add `MAIL_USERNAME`/`MAIL_PASSWORD` to the WSGI file, reload.
+- On PythonAnywhere: pull, `flask --app app reset-absences`, add `MAIL_USERNAME`/`MAIL_PASSWORD` to the WSGI file, reload.
 - Pick the sending Gmail account and create an app password.
 - Optional: screenshots in the README.
 - Anything the course or the lab assistant asks for after a demo.
