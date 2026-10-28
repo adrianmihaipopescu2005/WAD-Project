@@ -3,7 +3,15 @@ from flask_login import current_user
 
 from ...decorators import staff_required
 from ...extensions import db
-from ...models import ROLE_ASSISTANT, STATUS_ACTIVE, Absence, Student, Team, User
+from ...models import (
+    DECISION_PENDING,
+    ROLE_ASSISTANT,
+    STATUS_ACTIVE,
+    Absence,
+    Student,
+    Team,
+    User,
+)
 from ...services import validation
 from ...services.teams import visible_students
 
@@ -18,7 +26,7 @@ def _stats():
         .join(Absence.student).join(Student.team)
         .where(Absence.status == STATUS_ACTIVE)
     )
-    to_review = active.where(Absence.motivated.is_(False))
+    to_review = active.where(Absence.decision == DECISION_PENDING)
     if not current_user.is_admin:
         teams, students, active, to_review = (
             stmt.where(Team.assistant_id == current_user.id)

@@ -145,6 +145,23 @@ def _register_cli(app):
             click.echo(f"  assistant: {email} / {password}")
         click.echo("Demo teams are ready on the public form (/report/).")
 
+    @app.cli.command("reset-absences")
+    @click.option("--yes", is_flag=True, help="Don't ask for confirmation.")
+    def reset_absences_command(yes):
+        """Delete ALL absences and recreate their table with the current columns.
+
+        Users, teams and students are kept. Use it after an update that changed the absences
+        table (2026-10-28: decision + email), instead of deleting the whole database.
+        """
+        from .models import Absence
+
+        if not yes:
+            click.confirm("This deletes ALL absences (users and teams are kept). Continue?",
+                          abort=True)
+        Absence.__table__.drop(db.engine, checkfirst=True)
+        Absence.__table__.create(db.engine)
+        click.echo("The absences table was recreated (empty).")
+
     @app.cli.command("import-teams")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False))
     @click.option("--assistant", "assistant_email",

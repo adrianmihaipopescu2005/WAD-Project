@@ -17,11 +17,22 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
 - [x] **M9: Teams, deadline and "motivated" (2026-10-28).** Students pick their team and name instead of a student number, report by the day before, and staff tick "motivated".
+- [x] **M10: Decision emails (2026-10-28).** Required student email; pending / motivated / not motivated; each decision emails the student.
 
 ## Open questions
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M10: Decision emails (2026-10-28)
+- User decisions: the student's email is **required** on the public form; staff choose **Motivated** or **Not motivated** (a third state, **Pending**, replaces the unticked checkbox) and the student gets an email either way.
+- `absences`: `motivated` replaced by `decision` (CHECK `pending`/`motivated`/`not_motivated`), plus `email` (NOT NULL), `decided_at`, `notified_at`. `Absence.motivated` is now a property.
+- `services/mail.py`: stdlib `smtplib` + STARTTLS, settings `MAIL_SERVER/PORT/USERNAME/PASSWORD/SENDER` from env (Gmail app password). Never raises; without `MAIL_USERNAME` it logs and returns False. `MAIL_SUPPRESS` collects emails in `app.extensions["mail_outbox"]` for tests.
+- `POST /absences/<id>/decision`: commits the decision, then emails; a failed email returns a warning ("click the same button again to retry") and the row shows "Not emailed". Rows show the decision badge, the student's email and "Emailed".
+- Decision filter on the absences page; dashboard "Pending decision" count and "Review N" button; API and excused widget report `decision`.
+- `absence-actions.js`: also sends the clicked button's name/value (`FormData(form)` leaves it out).
+- `flask reset-absences [--yes]`: recreates only the absences table, so the deployed DB keeps users and teams.
+- Tests: **261 passed**, ruff clean. Real Gmail sending not tested (no credentials here); the SMTP failure paths are tested with mocks.
+
 ### M9: Teams, reporting deadline, "motivated" (2026-10-28)
 - User decisions: one lab assistant (Darian), who doesn't have the students' codes. Students are in **teams of two** with a fixed slot (team list supplied by the user, 38 teams). Students pick their team, then which of the two they are. Report by **23:59 the day before** (Monday for Tuesday, Wednesday for Thursday). Admin and assistant tick **"Motivated"**. Staff don't enter absences.
 - Model: new `teams` table (slot CHECK, FK to the assistant `ON DELETE RESTRICT`). `students` now has `team_id` (FK `ON DELETE CASCADE`) and `name`; `student_number`, `first_name`/`last_name`, `email`, `study_group` and `assistant_id` were removed. `absences` got `motivated` (default false) and lost `source`. Scoping goes through `Team.assistant_id`.

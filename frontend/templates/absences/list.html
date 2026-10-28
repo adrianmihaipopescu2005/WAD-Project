@@ -6,8 +6,8 @@
 <div class="page-header">
   <div>
     <h1 class="h3">{{ "Absences" if current_user.is_admin else "My teams' absences" }}</h1>
-    <p class="page-subtitle">Students report absences on the public form. Check the reason, then tick
-      "Motivated". Changes apply instantly.</p>
+    <p class="page-subtitle">Students report absences on the public form. Check the reason, then choose
+      "Motivated" or "Not motivated": the student gets an email.</p>
   </div>
 </div>
 
@@ -37,11 +37,12 @@
     </select>
   </div>
   <div class="col-6 col-lg">
-    <label class="visually-hidden" for="motivated">Motivated</label>
-    <select class="form-select" id="motivated" name="motivated">
-      <option value="">Motivated or not</option>
-      <option value="no" {{ "selected" if filters.motivated == "no" }}>Not motivated yet</option>
-      <option value="yes" {{ "selected" if filters.motivated == "yes" }}>Motivated</option>
+    <label class="visually-hidden" for="decision">Decision</label>
+    <select class="form-select" id="decision" name="decision">
+      <option value="">Any decision</option>
+      {% for code, label in decisions.items() %}
+        <option value="{{ code }}" {{ "selected" if filters.decision == code }}>{{ label }}</option>
+      {% endfor %}
     </select>
   </div>
   <div class="col-6 col-lg">

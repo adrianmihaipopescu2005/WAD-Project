@@ -7,7 +7,8 @@
   <div class="col-md-8 col-lg-6">
     <div class="alert alert-success" role="status">
       <h1 class="h4 alert-heading"><i class="bi bi-check-circle" aria-hidden="true"></i> Absence reported</h1>
-      <p class="mb-0">Thanks, {{ summary.name }}! Your lab assistant will check the reason and mark it motivated.</p>
+      <p class="mb-0">Thanks, {{ summary.name }}! Your lab assistant will check the reason. You'll get an email at
+        <strong>{{ summary.email }}</strong> saying whether your absence was motivated.</p>
     </div>
     <dl class="row form-card mx-0">
       <dt class="col-sm-4">Lab slot</dt><dd class="col-sm-8">{{ summary.slot }}</dd>

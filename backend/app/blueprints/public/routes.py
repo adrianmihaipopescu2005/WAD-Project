@@ -18,7 +18,7 @@ def report():
     if form.validate_on_submit():
         try:
             absence = service.submit_public(
-                form.student_id.data, form.start_date.data, form.reason.data,
+                form.student_id.data, form.start_date.data, form.reason.data, form.email.data,
             )
         except service.AbsenceError as e:
             field = form.student_id if e.status == 404 else form.start_date
@@ -29,6 +29,7 @@ def report():
                 "name": absence.student.name,
                 "slot": absence.slot_label,
                 "date": absence.start_date.isoformat(),
+                "email": absence.email,
             }
             return redirect(url_for("public.thanks"))
     return render_template("public/report.html", form=form, teams=teams, slots=SLOTS)

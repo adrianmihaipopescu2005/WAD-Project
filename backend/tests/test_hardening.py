@@ -23,7 +23,7 @@ def student(db, assistant):
 def _report(student_id=1, **override):
     return {
         "student_id": student_id, "start_date": NEXT_TUESDAY.isoformat(), "reason": "x",
-        **override,
+        "email": "a@b.ro", **override,
     }
 
 
@@ -51,7 +51,9 @@ def test_public_date_window(client, db, student, day, ok):
 # --- generic duplicate message ----------------------------------------------------------
 
 def test_duplicate_message_is_generic(client, db, student):
-    db.session.add(Absence(student=student, slot="TUE_18_20", start_date=NEXT_TUESDAY, reason="x"))
+    db.session.add(Absence(
+        email="s@example.com",
+        student=student, slot="TUE_18_20", start_date=NEXT_TUESDAY, reason="x"))
     db.session.commit()
     res = client.post("/report/", data=_report(student.id))
     assert res.status_code == 200

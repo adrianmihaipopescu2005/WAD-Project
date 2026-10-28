@@ -64,12 +64,16 @@ def test_team_label_and_teammates(assistant):
 def test_valid_absences_accepted(db, assistant):
     s = add_student(assistant)
     db.session.add_all([
-        Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="Doctor"),
-        Absence(student=s, slot="THU_18_20", start_date=THURSDAY, reason="Exam", sessions_count=2),
+        Absence(
+            email="s@example.com",
+            student=s, slot="TUE_18_20", start_date=TUESDAY, reason="Doctor"),
+        Absence(
+            email="s@example.com",
+            student=s, slot="THU_18_20", start_date=THURSDAY, reason="Exam", sessions_count=2),
     ])
     db.session.commit()
     assert len(s.absences) == 2
-    assert not s.absences[0].motivated  # staff tick it later
+    assert s.absences[0].decision == "pending"  # staff decide later
 
 
 @pytest.mark.parametrize(
@@ -78,26 +82,32 @@ def test_valid_absences_accepted(db, assistant):
 )
 def test_slot_weekday_mismatch_rejected(db, assistant, slot, day):
     s = add_student(assistant)
-    _add_and_expect_integrity_error(db, Absence(student=s, slot=slot, start_date=day, reason="x"))
+    _add_and_expect_integrity_error(db, Absence(
+        email="s@example.com", student=s, slot=slot, start_date=day, reason="x"))
 
 
 def test_sessions_count_must_be_positive(db, assistant):
     s = add_student(assistant)
     _add_and_expect_integrity_error(
-        db, Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", sessions_count=0)
+        db, Absence(
+            email="s@example.com",
+            student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", sessions_count=0)
     )
 
 
 def test_invalid_status_rejected(db, assistant):
     s = add_student(assistant)
     _add_and_expect_integrity_error(
-        db, Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", status="pending")
+        db, Absence(
+            email="s@example.com",
+            student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", status="pending")
     )
 
 
 def test_deleting_team_deletes_students_and_absences(db, assistant):
     s = add_student(assistant)
-    db.session.add(Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x"))
+    db.session.add(Absence(
+        email="s@example.com", student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x"))
     db.session.commit()
     # Through the DB's ON DELETE CASCADE, not only the ORM.
     db.session.execute(text("DELETE FROM teams"))
@@ -117,9 +127,21 @@ def test_covers():
     assert not a.covers(TUESDAY)
 
 
-def test_excuses_needs_motivated():
+@pytest.mark.parametrize(("decision", "excused"),
+                         [("pending", False), ("not_motivated", False), ("motivated", True)])
+def test_excuses_needs_motivated(decision, excused):
     a = Absence(slot="TUE_18_20", start_date=TUESDAY, sessions_count=1, status="active",
-                motivated=False)
-    assert a.covers(TUESDAY) and not a.excuses(TUESDAY)
-    a.motivated = True
-    assert a.excuses(TUESDAY)
+                decision=decision)
+    assert a.covers(TUESDAY)
+    assert a.excuses(TUESDAY) is excused
+
+
+def test_decision_checked_and_email_required(db, assistant):
+    s = add_student(assistant)
+    _add_and_expect_integrity_error(db, Absence(
+        email="s@example.com", student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x",
+        decision="maybe",
+    ))
+    _add_and_expect_integrity_error(
+        db, Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x")
+    )

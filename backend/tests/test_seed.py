@@ -20,8 +20,9 @@ def test_seed_demo_inserts_consistent_data(app, db):
     # All dates passed the DB slot/weekday CHECK. Relative dates are as expected:
     first = _absence_of(db, "Ana Popescu")
     assert first.start_date == date(2026, 10, 27) and first.motivated
+    assert first.email == "ana.popescu@student.demo.local"
     assert any(a.status == STATUS_REVOKED for a in absences)
-    assert any(not a.motivated for a in absences)  # something left to review
+    assert {a.decision for a in absences} == {"pending", "motivated", "not_motivated"}
 
 
 def test_seed_on_a_tuesday_uses_that_day(app, db):
@@ -72,3 +73,17 @@ def test_import_teams_cli(app, db, tmp_path):
     path.write_text("Popescu Adrian Mihai | Someone Else\n", encoding="utf-8")
     result = runner.invoke(args=["import-teams", str(path)])
     assert result.exit_code != 0 and "Nothing was imported" in result.output
+
+
+def test_reset_absences_keeps_users_and_teams(app, db):
+    seed_demo(today=date(2026, 10, 26))
+    runner = app.test_cli_runner()
+    assert runner.invoke(args=["reset-absences"], input="n\n").exit_code != 0  # aborted
+    assert db.session.scalar(db.select(db.func.count(Absence.id))) == 6
+
+    result = runner.invoke(args=["reset-absences", "--yes"])
+    assert result.exit_code == 0, result.output
+    db.session.expire_all()
+    assert db.session.scalar(db.select(db.func.count(Absence.id))) == 0
+    assert db.session.scalar(db.select(db.func.count(Team.id))) == 5
+    assert db.session.scalar(db.select(db.func.count(User.id))) == 2

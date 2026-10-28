@@ -1,11 +1,12 @@
-{#- One absence row. Rendered in tables and returned by revoke/extend/motivated for in-place updates.
+{#- One absence row. Rendered in tables and returned by revoke/extend/decision for in-place updates.
     Needs: a (Absence), show_student (bool), next_url (where non-JS posts redirect back). -#}
-{% from "_macros/absences.html" import status_badge %}
+{% from "_macros/absences.html" import status_badge, decision_badge %}
 {% set max_extra = max_sessions - a.sessions_count %}
-<tr id="absence-{{ a.id }}" data-status="{{ a.status }}" data-motivated="{{ 'yes' if a.motivated else 'no' }}" tabindex="-1">
+<tr id="absence-{{ a.id }}" data-status="{{ a.status }}" data-decision="{{ a.decision }}" tabindex="-1">
   {% if show_student %}
     <td>
       <a href="{{ url_for('teams.profile', student_id=a.student.id) }}">{{ a.student.name }}</a>
+      <div class="small text-body-secondary text-break">{{ a.email }}</div>
     </td>
   {% endif %}
   <td class="text-nowrap">{{ a.slot_label }}</td>
@@ -14,21 +15,34 @@
   <td class="text-end" data-field="sessions">{{ a.sessions_count }}</td>
   <td class="text-break">{{ a.reason }}</td>
   <td>
-    {# A toggle: posts the opposite value. absence-actions.js sends it with fetch. #}
-    <form class="js-absence-action" method="post"
-          action="{{ url_for('absences.motivated', absence_id=a.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="next" value="{{ next_url }}">
-      <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">
-      <input type="hidden" name="motivated" value="{{ '0' if a.motivated else '1' }}">
-      <button type="submit" class="btn btn-sm text-nowrap {{ 'btn-success' if a.motivated else 'btn-outline-secondary' }}"
-              aria-pressed="{{ 'true' if a.motivated else 'false' }}"
-              {{ "disabled" if a.status != "active" }}
-              title="{{ 'Click to unmark' if a.motivated else 'Click after checking the reason' }}">
-        <i class="bi bi-{{ 'check-square-fill' if a.motivated else 'square' }}" aria-hidden="true"></i>
-        Motivated
-      </button>
-    </form>
+    <div class="d-flex flex-column align-items-start gap-1">
+      {{ decision_badge(a) }}
+      {% if a.decision != "pending" %}
+        <span class="small text-body-secondary text-nowrap">
+          {% if a.notified_at %}<i class="bi bi-envelope-check" aria-hidden="true"></i> Emailed
+          {% else %}<i class="bi bi-envelope-exclamation text-warning" aria-hidden="true"></i> Not emailed{% endif %}
+        </span>
+      {% endif %}
+      {% if a.status == "active" %}
+        {# Each button saves the decision and emails the student. Clicking the current one re-sends. #}
+        <form class="js-absence-action d-flex flex-nowrap gap-1" method="post"
+              action="{{ url_for('absences.decision', absence_id=a.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ next_url }}">
+          <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">
+          <button type="submit" name="decision" value="motivated"
+                  class="btn btn-sm text-nowrap {{ 'btn-success' if a.decision == 'motivated' else 'btn-outline-success' }}"
+                  aria-pressed="{{ 'true' if a.decision == 'motivated' else 'false' }}"
+                  title="{{ 'Send the email again' if a.decision == 'motivated' else 'Mark motivated and email ' ~ a.email }}">
+            <i class="bi bi-check-lg" aria-hidden="true"></i> Motivated</button>
+          <button type="submit" name="decision" value="not_motivated"
+                  class="btn btn-sm text-nowrap {{ 'btn-danger' if a.decision == 'not_motivated' else 'btn-outline-danger' }}"
+                  aria-pressed="{{ 'true' if a.decision == 'not_motivated' else 'false' }}"
+                  title="{{ 'Send the email again' if a.decision == 'not_motivated' else 'Mark not motivated and email ' ~ a.email }}">
+            <i class="bi bi-x-lg" aria-hidden="true"></i> Not motivated</button>
+        </form>
+      {% endif %}
+    </div>
   </td>
   <td>{{ status_badge(a) }}</td>
   <td class="text-end">

@@ -5,3 +5,8 @@
     <span class="badge text-bg-secondary">Revoked</span>
   {% endif %}
 {% endmacro %}
+
+{% macro decision_badge(absence) %}
+  {% set tone = {"pending": "warning", "motivated": "success", "not_motivated": "danger"}[absence.decision] %}
+  <span class="badge text-bg-{{ tone }}">{{ absence.decision_label }}</span>
+{% endmacro %}

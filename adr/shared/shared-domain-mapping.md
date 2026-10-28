@@ -14,7 +14,7 @@ One app has to serve as the Mobile Systems and Applications lab-absence tool and
 | System admin | `admin`: the professor. Adds/removes assistants and sees everything. |
 | Seller | `assistant`: a lab assistant. Sees only their own teams, their students and those students' absences. |
 | Customer | `Student`: a name in a `Team` (1–2 students, a fixed slot, one assistant). Has no login. |
-| License | `Absence`: a student, a slot (`TUE_18_20`/`THU_18_20`), `start_date`, `sessions_count`, a reason, `motivated` and a status. |
+| License | `Absence`: a student, a slot (`TUE_18_20`/`THU_18_20`), `start_date`, `sessions_count`, a reason, the student's `email`, a `decision` and a status. |
 | Create license | Students submit an absence through the public form. Staff don't create absences (decided 2026-10-28). |
 | Revoke license | Set `status = revoked` (reject or cancel). |
 | Extend license | Increase `sessions_count` (covers more weekly sessions). |
@@ -28,7 +28,7 @@ One app has to serve as the Mobile Systems and Applications lab-absence tool and
 
 - **Teams instead of student numbers (decided 2026-10-28, replaces the 2026-10-26 routing):** there is one lab assistant (Darian), and the assistant doesn't have the students' codes. Students are stored by name in teams of two with a fixed slot. On the public form a student picks their team, then which of the two they are. The absence goes to the team's assistant with the team's slot. The form never creates students; teams are added on the Teams page or with `flask import-teams`. Student numbers, the student lookup and `absences.source` were removed.
 - **Deadline (decided 2026-10-28, replaces the 30-days-back window):** a session can be reported until 23:59 the day before (Monday for Tuesday, Wednesday for Thursday), in Europe/Bucharest time, and at most 183 days ahead. A report covers one session; staff can still extend it.
-- **Motivated (decided 2026-10-28):** admin and assistants tick `motivated` after checking the reason. Only an active, motivated absence counts as excused.
+- **Decision + email (decided 2026-10-28, replaces the "motivated" checkbox):** an absence is `pending`, then admin or the assistant marks it `motivated` or `not_motivated`. The public form requires the student's email, and every decision emails the student (SMTP, Gmail app password in env vars; stdlib `smtplib`, no new dependency). The decision is committed before sending; a failed send is shown to staff as a warning and can be retried by clicking the same decision. Only an active, motivated absence counts as excused.
 - **Public abuse limits (decided 2026-10-26):** an in-memory rate limit per IP (10 report POSTs per minute, no extra dependency). The public "duplicate report" message is generic, so it doesn't reveal whether a student is already absent.
 - **Privacy trade-off (2026-10-28):** the public form lists every student's name by team, and anyone can report in a teammate's name. Accepted: staff check each absence before ticking "motivated". The real team list stays out of git (`backend/instance/`).
 

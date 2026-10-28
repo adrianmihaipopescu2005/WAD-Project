@@ -27,7 +27,7 @@ def thu_student(assistant):
 def _report(student, **override):
     return {
         "student_id": student.id, "start_date": TUESDAY.isoformat(),
-        "reason": "Medical appointment", **override,
+        "reason": "Medical appointment", "email": "Ana.Popescu@student.upt.ro", **override,
     }
 
 
@@ -72,6 +72,7 @@ def test_home_page_links_to_report(client):
 
 def test_submit_goes_to_the_teams_assistant(client, db, student, assistant):
     res = client.post("/report/", data=_report(student))
+    assert client.application.extensions.get("mail_outbox", []) == []  # only on a decision
     assert res.status_code == 302
     assert res.headers["Location"].endswith("/report/thanks")
 
@@ -80,7 +81,8 @@ def test_submit_goes_to_the_teams_assistant(client, db, student, assistant):
     assert absence.slot == "TUE_18_20"  # from the team, not from the form
     assert absence.status == STATUS_ACTIVE
     assert absence.sessions_count == 1
-    assert not absence.motivated  # staff tick it after checking
+    assert absence.decision == "pending"  # staff decide after checking
+    assert absence.email == "ana.popescu@student.upt.ro"  # stored lower-case
 
     login(client, assistant.email)
     assert "Medical appointment" in client.get("/absences/").get_data(as_text=True)
@@ -97,6 +99,7 @@ def test_thanks_page_shows_summary_once(client, db, student):
     client.post("/report/", data=_report(student))
     html = client.get("/report/thanks").get_data(as_text=True)
     assert "Ana Popescu" in html and "Tuesday 18–20" in html and "2026-10-27" in html
+    assert "ana.popescu@student.upt.ro" in html
     assert client.get("/report/thanks").headers["Location"].endswith("/report/")  # only once
 
 
@@ -155,7 +158,15 @@ def test_clock_uses_romanian_time():
     assert str(clock.TIMEZONE) == "Europe/Bucharest"
 
 
-@pytest.mark.parametrize("override", [{"reason": ""}, {"start_date": ""}, {"start_date": "x"}])
+def test_email_field_is_required(client, team):
+    html = client.get("/report/").get_data(as_text=True)
+    assert 'name="email"' in html and 'type="email"' in html and "required" in html
+
+
+@pytest.mark.parametrize("override", [
+    {"reason": ""}, {"start_date": ""}, {"start_date": "x"},
+    {"email": ""}, {"email": "not-an-email"}, {"email": "a b@c.ro"}, {"email": "x" * 251 + "@a.ro"},
+])
 def test_validation(client, db, student, override):
     res = client.post("/report/", data=_report(student, **override))
     assert res.status_code == 200
@@ -220,7 +231,8 @@ def csrf_client():
 
 
 def test_report_requires_csrf_token(csrf_client):
-    data = {"student_id": 1, "start_date": TUESDAY.isoformat(), "reason": "x"}
+    data = {"student_id": 1, "start_date": TUESDAY.isoformat(), "reason": "x",
+            "email": "a@b.ro"}
     assert csrf_client.post("/report/", data=data).status_code == 400
 
     page = csrf_client.get("/report/").get_data(as_text=True)

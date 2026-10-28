@@ -23,8 +23,10 @@ def student(db, assistant):
 @pytest.fixture
 def absence(db, student):
     """Tuesday slot, motivated: covers 2026-10-27 and 2026-11-03."""
-    a = Absence(student=student, slot="TUE_18_20", start_date=TUESDAY, sessions_count=2,
-                reason="Flu", motivated=True)
+    a = Absence(
+        email="s@example.com",
+        student=student, slot="TUE_18_20", start_date=TUESDAY, sessions_count=2,
+        reason="Flu", decision="motivated")
     db.session.add(a)
     db.session.commit()
     return a
@@ -107,21 +109,29 @@ def test_excused_first_session(client, key, absence):
     assert data == {
         "student_id": absence.student_id, "student_name": "Ana Pop", "date": "2026-10-27",
         "lab_day": True, "slot": "TUE_18_20", "slot_label": "Tuesday 18–20", "excused": True,
-        "reported": True, "motivated": True, "absence_id": absence.id, "until": "2026-11-03",
+        "reported": True, "motivated": True, "decision": "motivated",
+        "absence_id": absence.id, "until": "2026-11-03",
     }
 
 
 def test_reported_but_not_motivated_is_not_excused(client, db, key, absence):
-    absence.motivated = False
+    absence.decision = "pending"
     db.session.commit()
     data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
     assert data["excused"] is False
     assert data["reported"] is True and data["motivated"] is False
-    assert data["absence_id"] == absence.id
+    assert data["decision"] == "pending" and data["absence_id"] == absence.id
+
+
+def test_not_motivated_is_not_excused(client, db, key, absence):
+    absence.decision = "not_motivated"
+    db.session.commit()
+    data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
+    assert data["excused"] is False and data["decision"] == "not_motivated"
 
 
 def test_motivated_absence_wins_over_unreviewed_one(client, db, key, absence):
-    db.session.add(Absence(student_id=SID, slot="TUE_18_20",
+    db.session.add(Absence(email="s@example.com", student_id=SID, slot="TUE_18_20",
                            start_date=TUESDAY, reason="dup"))
     db.session.commit()
     data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
@@ -240,7 +250,7 @@ def test_dashboard_widget_without_js(client, assistant, absence, params, expecte
 
 
 def test_dashboard_widget_not_motivated(client, db, assistant, absence):
-    absence.motivated = False
+    absence.decision = "pending"
     db.session.commit()
     login(client, assistant.email)
     html = client.get(

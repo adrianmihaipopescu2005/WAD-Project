@@ -6,6 +6,9 @@ from .. import clock
 from ..extensions import db
 from ..models import (
     DAYS_AHEAD,
+    DECISION_MOTIVATED,
+    DECISION_NOT_MOTIVATED,
+    DECISIONS,
     MAX_SESSIONS,
     SLOTS,
     STATUS_ACTIVE,
@@ -14,7 +17,7 @@ from ..models import (
     Student,
     Team,
 )
-from . import commit_or_rollback
+from . import commit_or_rollback, mail
 from .teams import search_clause
 
 # Deliberately vague: it must not reveal whether a student is already absent on a date.
@@ -69,7 +72,7 @@ def _scoped(stmt, user):
 
 
 def list_absences(
-    user, student_id=None, status=None, slot=None, q=None, assistant_id=None, motivated=None
+    user, student_id=None, status=None, slot=None, q=None, assistant_id=None, decision=None
 ):
     """Absences visible to `user` (an assistant: only their teams'), newest first."""
     stmt = _scoped(db.select(Absence), user)
@@ -81,8 +84,8 @@ def list_absences(
         stmt = stmt.where(Absence.status == status)
     if slot in SLOTS:
         stmt = stmt.where(Absence.slot == slot)
-    if motivated in ("yes", "no"):
-        stmt = stmt.where(Absence.motivated.is_(motivated == "yes"))
+    if decision in DECISIONS:
+        stmt = stmt.where(Absence.decision == decision)
     if q:
         stmt = stmt.where(search_clause(q))
     stmt = stmt.order_by(Absence.start_date.desc(), Absence.id.desc())
@@ -116,12 +119,51 @@ def extend(absence, extra_sessions):
     commit_or_rollback()
 
 
-def set_motivated(absence, motivated):
-    """Tick or untick "motivated" after checking the reason."""
+def decide(absence, decision, staff):
+    """Mark the absence motivated or not motivated, then email the student.
+
+    The decision is saved first; returns whether the email was sent. Choosing the current
+    decision again just re-sends the email (e.g. after a failed send).
+    """
+    if decision not in (DECISION_MOTIVATED, DECISION_NOT_MOTIVATED):
+        raise AbsenceError("Choose motivated or not motivated.", 400)
     if absence.status != STATUS_ACTIVE:
-        raise AbsenceError("A revoked absence can't be marked motivated.")
-    absence.motivated = bool(motivated)
+        raise AbsenceError("A revoked absence can't be decided.")
+    absence.decision = decision
+    absence.decided_at = datetime.now(UTC)
+    absence.notified_at = None
     commit_or_rollback()
+
+    sent = mail.send(absence.email, *decision_email(absence, staff))
+    if sent:
+        absence.notified_at = datetime.now(UTC)
+        commit_or_rollback()
+    return sent
+
+
+def decision_email(absence, staff):
+    """(subject, body) of the email telling the student the decision."""
+    word = "motivated" if absence.motivated else "not motivated"
+    date = absence.start_date.strftime("%A %d %B %Y")
+    subject = f"Your lab absence on {absence.start_date.isoformat()} was {word}"
+    covers = (
+        f"It covers {absence.sessions_count} weekly sessions, until "
+        f"{absence.end_date.isoformat()}.\n" if absence.sessions_count > 1 else ""
+    )
+    outcome = (
+        "You are excused from this lab session." if absence.motivated else
+        "This absence is not excused. If you think this is a mistake, talk to your lab assistant."
+    )
+    body = (
+        f"Hi {absence.student.name},\n\n"
+        f"Your absence from the Mobile Systems and Applications lab ({absence.slot_label}) on "
+        f"{date} was marked {word.upper()} by {staff.name}.\n"
+        f"{covers}\n"
+        f"{outcome}\n\n"
+        f"The reason you gave: {absence.reason}\n\n"
+        "This is an automatic message from the Lab Absence Manager.\n"
+    )
+    return subject, body
 
 
 # --- public (no login) ---------------------------------------------------------------
@@ -141,7 +183,7 @@ def _overlaps_active(student, slot, start_date, sessions_count):
     return any(a.covers(day) for a in db.session.execute(stmt).scalars() for day in days)
 
 
-def submit_public(student_id, start_date, reason):
+def submit_public(student_id, start_date, reason, email):
     """A student's own report of one session. The slot is their team's slot."""
     student = db.session.get(Student, student_id) if student_id else None
     if student is None:
@@ -153,10 +195,15 @@ def submit_public(student_id, start_date, reason):
     reason = (reason or "").strip()
     if not reason:
         raise AbsenceError("A reason is required.", 400)
+    email = (email or "").strip().lower()
+    if not email:
+        raise AbsenceError("An email address is required.", 400)
     if _overlaps_active(student, slot, start_date, 1):
         raise AbsenceError(DUPLICATE_PUBLIC_MESSAGE)
 
-    absence = Absence(student=student, slot=slot, start_date=start_date, reason=reason)
+    absence = Absence(
+        student=student, slot=slot, start_date=start_date, reason=reason, email=email
+    )
     db.session.add(absence)
     commit_or_rollback()
     return absence

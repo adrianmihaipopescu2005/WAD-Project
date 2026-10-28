@@ -17,7 +17,8 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 - `absences.slot` is one of `TUE_18_20`, `THU_18_20`, and `start_date` falls on that slot's weekday.
 - `absences.slot` is the student's team slot.
 - A student reports by 23:59 the day before the session (Romanian time): `start_date` is from tomorrow to `DAYS_AHEAD` (183) days ahead. "Today" comes from `app/clock.py` so tests can pin it.
-- `absences.motivated` is ticked by staff after checking the reason. Only an active, motivated absence excuses a student (validation API).
+- `absences.decision` is `pending`, `motivated` or `not_motivated`, set by staff after checking the reason. Only an active, motivated absence excuses a student (validation API).
+- `absences.email` (the student's) is required. Every decision emails the student (`services/mail.py`, SMTP via `MAIL_*` env vars); a failed email never undoes the decision.
 - `absences.sessions_count >= 1`. "Extend" increases it, so the absence covers the next weekly sessions of the same slot.
 - `absences.status` is `active` or `revoked`. "Revoke" sets `revoked` and is never a hard delete.
 - Every role check is enforced server-side, not just hidden in the UI.

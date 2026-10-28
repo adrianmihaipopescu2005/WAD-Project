@@ -92,9 +92,12 @@ def test_list_shows_active_absence_count(as_assistant, db, assistant):
     team = add_team(assistant, "Ana Pop", "Ion Ionescu")
     ana, ion = team.members
     db.session.add_all([
-        Absence(student=ana, slot="TUE_18_20", start_date=TUESDAY, reason="a"),
-        Absence(student=ion, slot="TUE_18_20", start_date=TUESDAY, reason="b"),
-        Absence(student=ion, slot="TUE_18_20", start_date=TUESDAY, reason="c",
+        Absence(
+            email="s@example.com", student=ana, slot="TUE_18_20", start_date=TUESDAY, reason="a"),
+        Absence(
+            email="s@example.com", student=ion, slot="TUE_18_20", start_date=TUESDAY, reason="b"),
+        Absence(
+            email="s@example.com", student=ion, slot="TUE_18_20", start_date=TUESDAY, reason="c",
                 status=STATUS_REVOKED),
     ])
     db.session.commit()
@@ -167,7 +170,9 @@ def test_create_validation(as_assistant, db, override):
 def test_profile_shows_team_and_absences(as_assistant, db, assistant):
     ana, ion = add_team(assistant, "Ana Pop", "Ion Ionescu").members
     db.session.add(
-        Absence(student=ana, slot="TUE_18_20", start_date=TUESDAY, sessions_count=2, reason="Flu")
+        Absence(
+            email="s@example.com",
+            student=ana, slot="TUE_18_20", start_date=TUESDAY, sessions_count=2, reason="Flu")
     )
     db.session.commit()
     html = as_assistant.get(f"/students/{ana.id}").get_data(as_text=True)
@@ -190,7 +195,8 @@ def test_profile_missing_is_404(as_assistant):
 def test_edit_prefills_and_renames_in_place(as_assistant, db, assistant):
     team = add_team(assistant, "Ana Pop", "Ion Ionescu")
     ana_id = team.members[0].id
-    db.session.add(Absence(student_id=ana_id, slot="TUE_18_20", start_date=TUESDAY, reason="x"))
+    db.session.add(Absence(
+        email="s@example.com", student_id=ana_id, slot="TUE_18_20", start_date=TUESDAY, reason="x"))
     db.session.commit()
     html = as_assistant.get(f"/teams/{team.id}/edit").get_data(as_text=True)
     assert 'value="Ana Pop"' in html and 'value="Ion Ionescu"' in html
@@ -230,7 +236,8 @@ def test_admin_can_reassign_on_edit(as_admin, db, assistant, other):
 
 def test_delete_cascades_students_and_absences(as_assistant, db, assistant):
     team = add_team(assistant, "Ana Pop", "Ion Ionescu")
-    db.session.add(Absence(student=team.members[0], slot="TUE_18_20", start_date=TUESDAY,
+    db.session.add(Absence(
+        email="s@example.com", student=team.members[0], slot="TUE_18_20", start_date=TUESDAY,
                            reason="x"))
     db.session.commit()
     res = as_assistant.post(f"/teams/{team.id}/delete")

@@ -2,7 +2,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 
 from ...decorators import staff_required
-from ...models import SLOTS
+from ...models import DECISIONS, SLOTS
 from ...services import absences as service
 from ...services.assistants import list_assistants
 from ...services.auth import safe_next_url
@@ -24,7 +24,7 @@ def _filters():
         "slot": args.get("slot") or None,
         "q": args.get("q", "").strip() or None,
         "assistant_id": args.get("assistant", type=int) if current_user.is_admin else None,
-        "motivated": args.get("motivated") or None,
+        "decision": args.get("decision") or None,
     }
 
 
@@ -47,6 +47,7 @@ def index():
         students=visible_students(current_user),
         assistants=list_assistants() if current_user.is_admin else [],
         slots=SLOTS,
+        decisions=DECISIONS,
         **_results_context(filters),
     )
 
@@ -63,13 +64,13 @@ def _back():
     return redirect(safe_next_url(request.form.get("next")) or url_for("absences.index"))
 
 
-def _action_done(absence, message):
+def _action_done(absence, message, category="success"):
     """Answer a revoke/extend/motivated action.
 
     fetch() gets JSON with the re-rendered row; a plain form post redirects back.
     """
     if not wants_json():
-        flash(message, "success")
+        flash(message, category)
         return _back()
     row = render_template(
         "absences/_row.html",
@@ -79,10 +80,11 @@ def _action_done(absence, message):
     )
     return {
         "message": message,
+        "category": category,
         "absence": {
             "id": absence.id,
             "status": absence.status,
-            "motivated": absence.motivated,
+            "decision": absence.decision,
             "sessions_count": absence.sessions_count,
             "end_date": absence.end_date.isoformat(),
         },
@@ -123,15 +125,22 @@ def extend(absence_id):
     )
 
 
-@bp.post("/<int:absence_id>/motivated")
+@bp.post("/<int:absence_id>/decision")
 @staff_required
-def motivated(absence_id):
-    """Tick or untick "motivated". The form sends the new value: motivated=1 or 0."""
+def decision(absence_id):
+    """Motivated / not motivated. Saves the decision, then emails the student."""
     absence = _absence_or_404(absence_id)
-    value = request.form.get("motivated") == "1"
     try:
-        service.set_motivated(absence, value)
+        sent = service.decide(absence, request.form.get("decision"), current_user)
     except service.AbsenceError as e:
         return _action_failed(e)
-    state = "motivated" if value else "not motivated"
-    return _action_done(absence, f"Absence of {absence.student.full_name} marked {state}.")
+    name = absence.student.name
+    label = absence.decision_label.lower()
+    if sent:
+        return _action_done(absence, f"{name}: {label}. Email sent to {absence.email}.")
+    return _action_done(
+        absence,
+        f"{name}: {label}, but the email to {absence.email} couldn't be sent. "
+        "Click the same button again later to retry.",
+        "warning",
+    )

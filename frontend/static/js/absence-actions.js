@@ -1,4 +1,4 @@
-// Revoke/extend in place: <form class="js-absence-action"> posts with fetch and the server
+// Revoke/extend/decision in place: <form class="js-absence-action"> posts with fetch and the server
 // returns the re-rendered table row, which replaces the old one. No page reload.
 //   data-confirm: (optional) question to confirm before sending
 // Uses event delegation, so rows replaced by live search keep working.
@@ -15,6 +15,9 @@
 
     const row = form.closest("tr");
     const body = new FormData(form); // read before disabling: disabled inputs aren't sent
+    // FormData(form) leaves out the clicked button, which carries e.g. decision=motivated.
+    const submitter = event.submitter;
+    if (submitter && submitter.name) body.append(submitter.name, submitter.value);
     // Only touch controls that are enabled now, so e.g. a maxed-out Extend stays disabled.
     const controls = [...row.querySelectorAll("button, input")].filter((el) => !el.disabled);
     controls.forEach((el) => { el.disabled = true; });
@@ -28,7 +31,7 @@
         newRow.classList.add("row-flash"); // brief highlight so the change is noticed
         newRow.focus();
       }
-      App.showAlert(data.message, "success");
+      App.showAlert(data.message, data.category || "success"); // "warning" if the email failed
     } catch (err) {
       controls.forEach((el) => { el.disabled = false; });
       App.showAlert(err.message, "danger");

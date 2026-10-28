@@ -28,6 +28,16 @@ TEAM_SIZE = 2
 STATUS_ACTIVE = "active"
 STATUS_REVOKED = "revoked"
 
+# Staff decide on each absence after checking the reason (decided 2026-10-28).
+DECISION_PENDING = "pending"
+DECISION_MOTIVATED = "motivated"
+DECISION_NOT_MOTIVATED = "not_motivated"
+DECISIONS = {
+    DECISION_PENDING: "Pending",
+    DECISION_MOTIVATED: "Motivated",
+    DECISION_NOT_MOTIVATED: "Not motivated",
+}
+
 
 def _now():
     return datetime.now(UTC)
@@ -146,6 +156,10 @@ class Absence(db.Model):
         CheckConstraint(
             f"status IN ('{STATUS_ACTIVE}', '{STATUS_REVOKED}')", name="ck_absences_status"
         ),
+        CheckConstraint(
+            "decision IN (" + ", ".join(f"'{d}'" for d in DECISIONS) + ")",
+            name="ck_absences_decision",
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -157,8 +171,13 @@ class Absence(db.Model):
     sessions_count = db.Column(db.Integer, nullable=False, default=1)
     reason = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(16), nullable=False, default=STATUS_ACTIVE)
-    # Ticked by staff after checking the reason. Only a motivated absence excuses the student.
-    motivated = db.Column(db.Boolean, nullable=False, default=False)
+    # Where the student is told the decision.
+    email = db.Column(db.String(255), nullable=False)
+    # Set by staff after checking the reason. Only a motivated absence excuses the student.
+    decision = db.Column(db.String(16), nullable=False, default=DECISION_PENDING)
+    decided_at = db.Column(db.DateTime(timezone=True))
+    # When the student was last emailed the current decision (None: not sent or it failed).
+    notified_at = db.Column(db.DateTime(timezone=True))
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
     revoked_at = db.Column(db.DateTime(timezone=True))
 
@@ -167,6 +186,14 @@ class Absence(db.Model):
     @property
     def slot_label(self):
         return SLOTS[self.slot][0]
+
+    @property
+    def motivated(self):
+        return self.decision == DECISION_MOTIVATED
+
+    @property
+    def decision_label(self):
+        return DECISIONS[self.decision]
 
     @property
     def end_date(self):

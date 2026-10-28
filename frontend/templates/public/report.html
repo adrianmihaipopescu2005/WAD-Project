@@ -61,6 +61,7 @@
       </div>
 
       {{ render_field(form.reason, rows=3, maxlength=500) }}
+      {{ render_field(form.email, autocomplete="email", placeholder="name@student.upt.ro") }}
 
       {{ form.submit(class="btn btn-primary") }}
     </form>

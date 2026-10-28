@@ -8,7 +8,19 @@ load the real teams with `flask import-teams`.
 from datetime import UTC, datetime, timedelta
 
 from .extensions import db
-from .models import ROLE_ADMIN, ROLE_ASSISTANT, SLOTS, STATUS_REVOKED, Absence, Student, Team, User
+from .models import (
+    DECISION_MOTIVATED,
+    DECISION_NOT_MOTIVATED,
+    DECISION_PENDING,
+    ROLE_ADMIN,
+    ROLE_ASSISTANT,
+    SLOTS,
+    STATUS_REVOKED,
+    Absence,
+    Student,
+    Team,
+    User,
+)
 
 ADMIN = ("prof@demo.local", "Prof. Elena Ionescu", "demo-admin-123")
 ASSISTANTS = [
@@ -22,14 +34,15 @@ TEAMS = [
     ("THU_18_20", ["Elena Radu", "Florin Matei"]),
     ("THU_18_20", ["Gabriela Tudor", "Horia Lazar"]),
 ]
-# (student name, weeks from the next session, sessions, reason, motivated, revoked)
+M, N, P = DECISION_MOTIVATED, DECISION_NOT_MOTIVATED, DECISION_PENDING
+# (student name, weeks from the next session, sessions, reason, decision, revoked)
 ABSENCES = [
-    ("Ana Popescu", 0, 1, "Medical appointment (note attached by email).", True, False),
-    ("Bogdan Marin", 0, 1, "Hackathon in Cluj.", False, False),
-    ("Cristina Stan", 1, 1, "Family event.", False, False),
-    ("Dan Georgescu", 0, 1, "Overslept.", False, True),
-    ("Elena Radu", 0, 3, "Erasmus interview trip.", True, False),
-    ("Gabriela Tudor", -1, 1, "Sick (last week).", True, False),
+    ("Ana Popescu", 0, 1, "Medical appointment (note attached by email).", M, False),
+    ("Bogdan Marin", 0, 1, "Hackathon in Cluj.", P, False),
+    ("Cristina Stan", 1, 1, "Family event.", P, False),
+    ("Dan Georgescu", 0, 1, "Overslept.", N, True),
+    ("Elena Radu", 0, 3, "Erasmus interview trip.", M, False),
+    ("Gabriela Tudor", -1, 1, "Sick (last week).", M, False),
 ]
 
 
@@ -55,13 +68,14 @@ def seed_demo(today=None):
             members = [Student(name=n) for n in names]
             db.session.add(Team(assistant=assistant, slot=slot, members=members))
             students.update((m.name, m) for m in members)
-        for name, weeks, sessions, reason, motivated, revoked in ABSENCES:
+        for name, weeks, sessions, reason, decision, revoked in ABSENCES:
             student = students[name]
             slot = next(t[0] for t in TEAMS if name in t[1])
             start = _next_weekday(today, SLOTS[slot][1]) + timedelta(weeks=weeks)
             absence = Absence(
                 student=student, slot=slot, start_date=start,
-                sessions_count=sessions, reason=reason, motivated=motivated,
+                sessions_count=sessions, reason=reason, decision=decision,
+                email=f"{name.replace(' ', '.').lower()}@student.demo.local",
             )
             if revoked:
                 absence.status = STATUS_REVOKED

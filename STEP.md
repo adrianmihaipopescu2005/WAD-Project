@@ -3,7 +3,7 @@
 Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M9: Teams, deadline and "motivated".** Committed and pushed (5f2082d), **not deployed yet**: PythonAnywhere still runs the M8 version.
+**M10: Decision emails.** Done locally, not committed yet. M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -54,11 +54,15 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
   - "Motivated" toggle for admin/assistant; only motivated absences excuse a student. Staff create page removed.
   - Teams page, `flask import-teams` (real list in git-ignored `backend/instance/teams.txt`, 38 teams), seed with Darian.
   - 243 tests pass. The new public-form JS hasn't been tried in a real browser yet.
+- **M10:**
+  - Required student email on the form. Pending / Motivated / Not motivated buttons; each decision emails the student (Gmail SMTP via `MAIL_*` env vars).
+  - `flask reset-absences` to update the deployed DB without losing users/teams.
+  - 261 tests pass. Real email sending not tried yet (needs the Gmail app password).
 
 ## Next
 - Try the new public form and the Motivated toggle in a browser.
-- On PythonAnywhere: pull, recreate the DB (schema changed), add Darian, upload `teams.txt`, `import-teams`, reload.
-- Darian's real email (placeholder `darian@lab.local` in the demo).
+- Commit + push M10. On PythonAnywhere: pull, `flask --app app reset-absences`, add `MAIL_USERNAME`/`MAIL_PASSWORD` to the WSGI file, reload.
+- Pick the sending Gmail account and create an app password.
 - Optional: screenshots in the README.
 - Anything the course or the lab assistant asks for after a demo.
 
@@ -73,7 +77,7 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
 - Dynamic features, a course requirement (decided 2026-10-23): revoke/extend in place, live search, smart absence form, excused-check widget. Vanilla JS `fetch` + JSON, progressive enhancement. See `adr/shared/shared-dynamic-features.md`.
 - Public form (decided 2026-10-28, replaces the 2026-10-26 student-number matching): students pick their team, then their name. Teams have a fixed slot and one assistant (Darian). The form never creates students.
 - Deadline (decided 2026-10-28): report by 23:59 the day before, Europe/Bucharest. Replaces the 30-days-back window.
-- "Motivated" (decided 2026-10-28): ticked by admin or assistant; only active + motivated absences excuse. Staff don't create absences.
+- Decision (decided 2026-10-28): pending → motivated / not motivated, set by admin or assistant, emailed to the student (email required). Only active + motivated absences excuse. Staff don't create absences.
 - Templates/static live in `frontend/`, and the Flask app in `backend/app/`.
 - Removing an assistant reassigns their teams to another assistant chosen by the admin (decided 2026-10-23). The DB keeps `ON DELETE RESTRICT` as a safety net.
 - Public pages: an in-memory per-IP rate limit and a generic duplicate message (decided 2026-10-26).

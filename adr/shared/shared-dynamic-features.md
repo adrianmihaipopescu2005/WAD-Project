@@ -10,7 +10,7 @@ The course requires 2–3 dynamic features, meaning JavaScript that talks to the
 
 ## Decision
 - The features:
-  1. **Motivated/revoke/extend in place** (absences page and student profile). `fetch` POST, then the row's motivated toggle, status, sessions and "until" date update in place.
+  1. **Decision/revoke/extend in place** (absences page and student profile). `fetch` POST, then the row's decision, status, sessions and "until" date update in place (the decision also emails the student).
   2. **Live search** (teams and absences pages). Typing filters the table from a JSON endpoint (debounced about 250 ms).
   3. **Smart absence form** (public form). The names dropdown (grouped by team) becomes a team picker plus "which one are you?" radios, and only dates on the team's weekday that are not past the deadline are accepted (updated 2026-10-28).
   4. **Excused-check widget**. It calls `GET /api/v1/validate` and shows the result instantly.

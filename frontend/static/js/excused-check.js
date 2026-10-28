@@ -40,8 +40,10 @@
         render("excused", "✓ Excused.",
           `${r.student_name} on ${r.date} (${r.slot_label}), motivated absence #${r.absence_id}, until ${r.until}.`);
       } else if (r.reported) {
-        render("not-motivated", "✗ Not excused yet.",
-          `${r.student_name} reported absence #${r.absence_id} for ${r.date} (${r.slot_label}), but it isn't marked motivated.`);
+        const pending = r.decision === "pending";
+        render("not-motivated", pending ? "✗ Not excused yet." : "✗ Not excused.",
+          `${r.student_name} reported absence #${r.absence_id} for ${r.date} (${r.slot_label}), ` +
+          (pending ? "still pending a decision." : "marked not motivated."));
       } else {
         render("not-excused", "✗ Not excused.", `${r.student_name} on ${r.date} (${r.slot_label}).`);
       }

@@ -19,9 +19,11 @@ JSON = {"Accept": "application/json"}
 
 
 def _absence(db, student, slot="TUE_18_20", start=TUESDAY, sessions=1, status=STATUS_ACTIVE,
-             reason="Doctor", motivated=False):
-    a = Absence(student=student, slot=slot, start_date=start, sessions_count=sessions,
-                status=status, reason=reason, motivated=motivated)
+             reason="Doctor", decision="pending"):
+    a = Absence(
+        email="s@example.com",
+        student=student, slot=slot, start_date=start, sessions_count=sessions,
+        status=status, reason=reason, decision=decision)
     db.session.add(a)
     db.session.commit()
     return a
@@ -94,18 +96,20 @@ def test_assistant_assistant_filter_is_ignored(as_assistant, db, mine, theirs, o
     assert "their-reason" not in html
 
 
-@pytest.mark.parametrize("action", ["revoke", "extend", "motivated"])
+@pytest.mark.parametrize("action", ["revoke", "extend", "decision"])
 @pytest.mark.parametrize("headers", [{}, JSON])
 def test_cannot_act_on_other_assistants_absence(as_assistant, db, theirs, action, headers):
     a = _absence(db, theirs)
     res = as_assistant.post(
-        f"/absences/{a.id}/{action}", data={"sessions": 1, "motivated": "1"}, headers=headers
+        f"/absences/{a.id}/{action}", data={"sessions": 1, "decision": "motivated"},
+        headers=headers,
     )
     assert res.status_code == 404
     if headers:
         assert "error" in res.get_json()
     a = _reload(db, a.id)
-    assert a.status == STATUS_ACTIVE and a.sessions_count == 1 and not a.motivated
+    assert a.status == STATUS_ACTIVE and a.sessions_count == 1 and a.decision == "pending"
+    assert outbox(as_assistant) == []
 
 
 # --- filters ------------------------------------------------------------------------
@@ -113,7 +117,7 @@ def test_cannot_act_on_other_assistants_absence(as_assistant, db, theirs, action
 def test_filters(as_assistant, db, assistant, mine):
     second = add_student(assistant, "Ion Ionescu")
     _absence(db, mine, reason="tue-active")
-    _absence(db, mine, slot="THU_18_20", start=THURSDAY, reason="thu-active", motivated=True)
+    _absence(db, mine, slot="THU_18_20", start=THURSDAY, reason="thu-active", decision="motivated")
     _absence(db, second, status=STATUS_REVOKED, reason="ion-revoked")
 
     def page(qs):
@@ -127,9 +131,9 @@ def test_filters(as_assistant, db, assistant, mine):
     assert "thu-active" in html and "tue-active" not in html
     html = page("q=ionescu")
     assert "ion-revoked" in html and "thu-active" not in html
-    html = page("motivated=yes")
+    html = page("decision=motivated")
     assert "thu-active" in html and "tue-active" not in html
-    html = page("motivated=no")
+    html = page("decision=pending")
     assert "tue-active" in html and "thu-active" not in html
     assert "No absences match" in page("q=zzz")
 
@@ -272,49 +276,128 @@ def test_extend_capped_at_max(as_assistant, db, mine):
     assert _reload(db, a.id).sessions_count == MAX_SESSIONS
 
 
-# --- motivated ----------------------------------------------------------------------
+# --- decision (motivated / not motivated) + email -----------------------------------
 
-def test_mark_motivated_json(as_assistant, db, mine):
+def outbox(client):
+    return client.application.extensions.get("mail_outbox", [])
+
+
+def _decide(client, absence, decision, **extra):
+    return client.post(f"/absences/{absence.id}/decision",
+                       data={"decision": decision, **extra}, headers=JSON)
+
+
+def test_new_absence_is_pending_with_buttons(as_assistant, db, mine):
+    _absence(db, mine)
+    html = as_assistant.get("/absences/").get_data(as_text=True)
+    assert 'data-decision="pending"' in html and ">Pending<" in html
+    assert 'name="decision" value="motivated"' in html
+    assert 'name="decision" value="not_motivated"' in html
+    assert "s@example.com" in html  # staff see where the email goes
+
+
+def test_mark_motivated_emails_the_student(as_assistant, db, mine, assistant):
     a = _absence(db, mine)
-    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
+    res = _decide(as_assistant, a, "motivated")
     assert res.status_code == 200
     data = res.get_json()
-    assert data["absence"]["motivated"] is True
-    assert 'data-motivated="yes"' in data["html"]
-    assert 'aria-pressed="true"' in data["html"]
-    assert 'name="motivated" value="0"' in data["html"]  # next click unticks it
-    assert "marked motivated" in data["message"]
+    assert data["absence"]["decision"] == "motivated" and data["category"] == "success"
+    assert 'data-decision="motivated"' in data["html"] and "Emailed" in data["html"]
+    assert "Email sent to s@example.com" in data["message"]
+
+    (mail,) = outbox(as_assistant)
+    assert mail["to"] == "s@example.com"
+    assert mail["subject"] == "Your lab absence on 2026-10-27 was motivated"
+    assert "Hi Mine Student" in mail["body"] and "MOTIVATED" in mail["body"]
+    assert "Tuesday 27 October 2026" in mail["body"] and assistant.name in mail["body"]
+    assert "You are excused" in mail["body"] and "Doctor" in mail["body"]
+
+    a = _reload(db, a.id)
+    assert a.motivated and a.decided_at is not None and a.notified_at is not None
+
+
+def test_mark_not_motivated_emails_the_student(as_assistant, db, mine):
+    a = _absence(db, mine)
+    _decide(as_assistant, a, "not_motivated")
+    (mail,) = outbox(as_assistant)
+    assert mail["subject"].endswith("was not motivated")
+    assert "NOT MOTIVATED" in mail["body"] and "not excused" in mail["body"]
+    assert _reload(db, a.id).decision == "not_motivated"
+
+
+def test_changing_the_decision_sends_a_new_email(as_assistant, db, mine):
+    a = _absence(db, mine)
+    _decide(as_assistant, a, "not_motivated")
+    _decide(as_assistant, a, "motivated")
+    first, second = outbox(as_assistant)
+    assert first["subject"].endswith("was not motivated")
+    assert second["subject"].endswith("was motivated")
     assert _reload(db, a.id).motivated
 
 
-def test_untick_motivated(as_assistant, db, mine):
-    a = _absence(db, mine, motivated=True)
-    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "0"}, headers=JSON)
-    assert res.get_json()["absence"]["motivated"] is False
-    assert not _reload(db, a.id).motivated
+def test_failed_email_keeps_the_decision_and_warns(as_assistant, db, mine, monkeypatch):
+    from app.services import mail
 
-
-def test_motivated_without_js(as_assistant, db, mine):
+    monkeypatch.setattr(mail, "send", lambda *args: False)
     a = _absence(db, mine)
-    res = as_assistant.post(
-        f"/absences/{a.id}/motivated", data={"motivated": "1", "next": f"/students/{mine.id}"}
-    )
+    data = _decide(as_assistant, a, "motivated").get_json()
+    assert data["category"] == "warning" and "couldn't be sent" in data["message"]
+    assert "Not emailed" in data["html"]
+    a = _reload(db, a.id)
+    assert a.motivated and a.notified_at is None
+
+    monkeypatch.undo()  # retry: click the same button again
+    _decide(as_assistant, a, "motivated")
+    assert _reload(db, a.id).notified_at is not None
+
+
+def test_decision_without_js(as_assistant, db, mine):
+    a = _absence(db, mine)
+    res = as_assistant.post(f"/absences/{a.id}/decision",
+                            data={"decision": "motivated", "next": f"/students/{mine.id}"})
     assert res.headers["Location"].endswith(f"/students/{mine.id}")
     assert _reload(db, a.id).motivated
 
 
-def test_revoked_cannot_be_motivated(as_assistant, db, mine):
+@pytest.mark.parametrize("decision", ["", "pending", "maybe"])
+def test_invalid_decision(as_assistant, db, mine, decision):
+    a = _absence(db, mine)
+    assert _decide(as_assistant, a, decision).status_code == 400
+    assert _reload(db, a.id).decision == "pending" and outbox(as_assistant) == []
+
+
+def test_revoked_cannot_be_decided(as_assistant, db, mine):
     a = _absence(db, mine, status=STATUS_REVOKED)
-    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
-    assert res.status_code == 409
-    assert not _reload(db, a.id).motivated
+    assert _decide(as_assistant, a, "motivated").status_code == 409
+    assert _reload(db, a.id).decision == "pending" and outbox(as_assistant) == []
 
 
-def test_admin_marks_any_absence_motivated(as_admin, db, theirs):
+def test_admin_decides_any_absence(as_admin, db, theirs):
     a = _absence(db, theirs)
-    res = as_admin.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
-    assert res.status_code == 200
+    assert _decide(as_admin, a, "motivated").status_code == 200
     assert _reload(db, a.id).motivated
+
+
+def test_mail_not_configured_fails_softly(app, db, mine):
+    from app.services import mail
+
+    app.config.update(MAIL_SUPPRESS=False, MAIL_USERNAME=None)
+    with app.test_request_context():
+        assert mail.send("s@example.com", "subject", "body") is False
+
+
+def test_mail_server_error_fails_softly(app, monkeypatch):
+    import smtplib
+
+    from app.services import mail
+
+    def refuse(*args, **kwargs):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(smtplib, "SMTP", refuse)
+    app.config.update(MAIL_SUPPRESS=False, MAIL_USERNAME="lab@gmail.com", MAIL_PASSWORD="x")
+    with app.test_request_context():
+        assert mail.send("s@example.com", "subject", "body") is False
 
 
 # --- profile ------------------------------------------------------------------------
@@ -323,7 +406,7 @@ def test_profile_has_actions(as_assistant, db, mine):
     _absence(db, mine)
     html = as_assistant.get(f"/students/{mine.id}").get_data(as_text=True)
     assert "/absences/new" not in html
-    assert f"/absences/{mine.absences[0].id}/motivated" in html
+    assert f"/absences/{mine.absences[0].id}/decision" in html
     assert "js/absence-actions.js" in html
     assert "js-absence-action" in html
     assert f'name="next" value="/students/{mine.id}"' in html
@@ -348,7 +431,7 @@ def csrf_app():
         assistant.set_password("pw")
         student = Student(name="A B")
         _db.session.add(Team(assistant=assistant, slot="TUE_18_20", members=[student]))
-        _db.session.add(_absence_obj := Absence(
+        _db.session.add(_absence_obj := Absence(email="s@example.com", 
             student=student, slot="TUE_18_20", start_date=TUESDAY, reason="x"
         ))
         _db.session.commit()

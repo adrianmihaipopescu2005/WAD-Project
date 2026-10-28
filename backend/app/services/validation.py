@@ -119,6 +119,7 @@ def check_excused(user, student_id, day):
         "excused": False,
         "reported": False,
         "motivated": False,
+        "decision": None,
         "absence_id": None,
         "until": None,
     }
@@ -134,9 +135,9 @@ def check_excused(user, student_id, day):
     ).scalars()
     covering = sorted((a for a in absences if a.covers(day)), key=lambda a: not a.motivated)
     if covering:
-        a = covering[0]  # a motivated one wins over one still waiting for review
+        a = covering[0]  # a motivated one wins over a pending or not motivated one
         result.update(
-            excused=a.motivated, reported=True, motivated=a.motivated,
+            excused=a.motivated, reported=True, motivated=a.motivated, decision=a.decision,
             absence_id=a.id, until=a.end_date.isoformat(),
         )
     return result

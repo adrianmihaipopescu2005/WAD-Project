@@ -126,7 +126,8 @@ def test_remove_reassigns_teams_and_keeps_absences(admin_client, db, assistant, 
     other = make_user("other@example.com", ROLE_ASSISTANT)
     s1 = _add_student(db, assistant, "S1")
     s2 = _add_student(db, assistant, "S2")
-    db.session.add(Absence(student=s1, slot="TUE_18_20", start_date=TUESDAY, reason="Doctor"))
+    db.session.add(Absence(
+        email="s@example.com", student=s1, slot="TUE_18_20", start_date=TUESDAY, reason="Doctor"))
     db.session.commit()
     assistant_id, other_id = assistant.id, other.id
 

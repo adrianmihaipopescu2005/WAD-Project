@@ -26,7 +26,7 @@
     </p>
   </div>
   {% if stats.to_review %}
-    <a class="btn btn-primary" href="{{ url_for('absences.index', motivated='no', status='active') }}">
+    <a class="btn btn-primary" href="{{ url_for('absences.index', decision='pending', status='active') }}">
       <i class="bi bi-check2-square" aria-hidden="true"></i> Review {{ stats.to_review }} absence(s)</a>
   {% endif %}
 </div>
@@ -38,7 +38,7 @@
   {{ stat_card("teams", ("Teams" if current_user.is_admin else "My teams") ~ " · " ~ stats.students ~ " students",
                stats.teams, "people", "indigo") }}
   {{ stat_card("active_absences", "Active absences", stats.active_absences, "calendar-x", "amber") }}
-  {{ stat_card("to_review", "Not motivated yet", stats.to_review, "hourglass-split", "rose") }}
+  {{ stat_card("to_review", "Pending decision", stats.to_review, "hourglass-split", "rose") }}
 </div>
 
 <div class="card mt-4">
