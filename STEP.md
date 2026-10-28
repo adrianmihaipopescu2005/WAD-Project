@@ -3,7 +3,7 @@
 Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M9: Teams, deadline and "motivated".** Done locally, **not committed or deployed yet**. M0–M8 are done and pushed; the app is hosted on PythonAnywhere (M8 version).
+**M9: Teams, deadline and "motivated".** Committed and pushed (5f2082d), **not deployed yet**: PythonAnywhere still runs the M8 version.
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -57,7 +57,7 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
 
 ## Next
 - Try the new public form and the Motivated toggle in a browser.
-- Commit + push M9, then on PythonAnywhere: pull, recreate the DB (schema changed), add Darian, upload `teams.txt`, `import-teams`, reload.
+- On PythonAnywhere: pull, recreate the DB (schema changed), add Darian, upload `teams.txt`, `import-teams`, reload.
 - Darian's real email (placeholder `darian@lab.local` in the demo).
 - Optional: screenshots in the README.
 - Anything the course or the lab assistant asks for after a demo.
