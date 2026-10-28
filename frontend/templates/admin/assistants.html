@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <h1 class="h3">Lab assistants</h1>
-    <p class="page-subtitle">Each assistant sees only their own students.</p>
+    <p class="page-subtitle">Each assistant sees only their own teams.</p>
   </div>
   <a class="btn btn-primary" href="{{ url_for('admin.new_assistant') }}"><i class="bi bi-person-plus" aria-hidden="true"></i> Add assistant</a>
 </div>
@@ -20,17 +20,17 @@
         <tr>
           <th scope="col">Name</th>
           <th scope="col">Email</th>
-          <th scope="col" class="text-end">Students</th>
+          <th scope="col" class="text-end">Teams</th>
           <th scope="col">Added</th>
           <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
       <tbody>
-        {% for assistant, student_count in assistants %}
+        {% for assistant, team_count in assistants %}
           <tr>
             <td>{{ assistant.name }}</td>
             <td>{{ assistant.email }}</td>
-            <td class="text-end" data-students="{{ assistant.id }}">{{ student_count }}</td>
+            <td class="text-end" data-teams="{{ assistant.id }}">{{ team_count }}</td>
             <td>{{ assistant.created_at.strftime("%Y-%m-%d") }}</td>
             <td class="text-end">
               <button type="button" class="btn btn-outline-danger btn-sm"
@@ -45,7 +45,7 @@
   </div>
 
   {# One confirmation modal per assistant; the reassignment choices exclude that assistant. #}
-  {% for assistant, student_count in assistants %}
+  {% for assistant, team_count in assistants %}
     {% set others = assistants | rejectattr("0.id", "equalto", assistant.id) | list %}
     <div class="modal fade" id="remove-{{ assistant.id }}" tabindex="-1"
          aria-labelledby="remove-{{ assistant.id }}-title" aria-hidden="true">
@@ -60,16 +60,16 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            {% if student_count == 0 %}
-              <p class="mb-0">This assistant has no students. Their account will be deleted.</p>
+            {% if team_count == 0 %}
+              <p class="mb-0">This assistant has no teams. Their account will be deleted.</p>
             {% elif not others %}
               <p class="mb-0 text-danger">
-                This assistant has {{ student_count }} student(s), and there is no other
+                This assistant has {{ team_count }} team(s), and there is no other
                 assistant to take them over. Add another assistant first.
               </p>
             {% else %}
               <label class="form-label" for="reassign-{{ assistant.id }}">
-                Move their {{ student_count }} student(s) and their absences to:
+                Move their {{ team_count }} team(s), with students and absences, to:
               </label>
               <select class="form-select" id="reassign-{{ assistant.id }}" name="reassign_to" required>
                 <option value="" selected disabled>Choose an assistant…</option>
@@ -82,7 +82,7 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-danger"
-                    {{ "disabled" if student_count and not others }}>Remove</button>
+                    {{ "disabled" if team_count and not others }}>Remove</button>
           </div>
         </form>
       </div>

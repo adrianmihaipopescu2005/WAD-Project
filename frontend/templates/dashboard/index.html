@@ -21,21 +21,24 @@
   <div>
     <h1 class="h3">Welcome back, {{ current_user.name }}</h1>
     <p class="page-subtitle">
-      {{ "Overview of every lab assistant's students." if current_user.is_admin
-         else "Your students and their absences at a glance." }}
+      {{ "Overview of every lab assistant's teams." if current_user.is_admin
+         else "Your teams and their absences at a glance." }}
     </p>
   </div>
-  <a class="btn btn-primary" href="{{ url_for('absences.new') }}">
-    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add absence</a>
+  {% if stats.to_review %}
+    <a class="btn btn-primary" href="{{ url_for('absences.index', motivated='no', status='active') }}">
+      <i class="bi bi-check2-square" aria-hidden="true"></i> Review {{ stats.to_review }} absence(s)</a>
+  {% endif %}
 </div>
 
 <div class="row g-3">
   {% if current_user.is_admin %}
     {{ stat_card("assistants", "Lab assistants", stats.assistants, "person-badge", "sky") }}
   {% endif %}
-  {{ stat_card("students", "Students" if current_user.is_admin else "My students",
-               stats.students, "people", "indigo") }}
+  {{ stat_card("teams", ("Teams" if current_user.is_admin else "My teams") ~ " · " ~ stats.students ~ " students",
+               stats.teams, "people", "indigo") }}
   {{ stat_card("active_absences", "Active absences", stats.active_absences, "calendar-x", "amber") }}
+  {{ stat_card("to_review", "Not motivated yet", stats.to_review, "hourglass-split", "rose") }}
 </div>
 
 <div class="card mt-4">
@@ -53,10 +56,13 @@
     <form class="row g-2 align-items-end" method="get" id="excused-check"
           data-endpoint="{{ url_for('api.validate') }}">
       <div class="col-sm-5">
-        <label class="form-label" for="check-number">Student number</label>
-        <input class="form-control" id="check-number" name="student_number" required
-               autocomplete="off" placeholder="e.g. LM1001"
-               value="{{ request.args.get('student_number', '') }}">
+        <label class="form-label" for="check-student">Student</label>
+        <select class="form-select" id="check-student" name="student_id" required>
+          <option value="">Choose a student…</option>
+          {% for s in students %}
+            <option value="{{ s.id }}" {{ "selected" if request.args.get('student_id') == s.id|string }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="col-sm-4">
         <label class="form-label" for="check-date">Date</label>

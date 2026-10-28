@@ -10,9 +10,9 @@ The course requires 2–3 dynamic features, meaning JavaScript that talks to the
 
 ## Decision
 - The features:
-  1. **Revoke/extend in place** (absences page and student profile). `fetch` POST, then the row's status, sessions and "until" date update in place.
-  2. **Live search** (students and absences pages). Typing filters the table from a JSON endpoint (debounced about 250 ms).
-  3. **Smart absence form** (public form). Only dates on the chosen slot's weekday are accepted, the "covered until" date is shown live, and the student number is looked up before submitting.
+  1. **Motivated/revoke/extend in place** (absences page and student profile). `fetch` POST, then the row's motivated toggle, status, sessions and "until" date update in place.
+  2. **Live search** (teams and absences pages). Typing filters the table from a JSON endpoint (debounced about 250 ms).
+  3. **Smart absence form** (public form). The names dropdown (grouped by team) becomes a team picker plus "which one are you?" radios, and only dates on the team's weekday that are not past the deadline are accepted (updated 2026-10-28).
   4. **Excused-check widget**. It calls `GET /api/v1/validate` and shows the result instantly.
 - Vanilla JS only (`fetch`, no jQuery or frameworks), one file per feature in `frontend/static/js/`, with no inline scripts.
 - **Progressive enhancement:** every page works without JS through normal forms and links, and JS only takes over the same actions.
@@ -24,7 +24,7 @@ The course requires 2–3 dynamic features, meaning JavaScript that talks to the
 - Each feature can be demoed by showing that the network tab has no page reload.
 - The same service functions serve both the HTML and JSON routes, so the rules aren't duplicated.
 
-- **Smart-form lookup privacy (decided 2026-10-26):** the public lookup reveals only the **initials and group** (for example "A. P. · group 2.1"), never the full name, email or assistant. An unknown number just says "not found".
+- **Smart-form lookup (2026-10-26) removed on 2026-10-28:** with teams there are no student numbers to look up. See the privacy trade-off in [shared-domain-mapping.md](shared-domain-mapping.md).
 
 ## Open questions
 - None.

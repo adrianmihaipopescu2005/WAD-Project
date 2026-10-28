@@ -5,10 +5,10 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="h3">{{ "Absences" if current_user.is_admin else "My students' absences" }}</h1>
-    <p class="page-subtitle">Filter, extend or revoke. Changes apply instantly.</p>
+    <h1 class="h3">{{ "Absences" if current_user.is_admin else "My teams' absences" }}</h1>
+    <p class="page-subtitle">Students report absences on the public form. Check the reason, then tick
+      "Motivated". Changes apply instantly.</p>
   </div>
-  <a class="btn btn-primary" href="{{ url_for('absences.new') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Add absence</a>
 </div>
 
 <form class="row g-2 mb-2" method="get" role="search"
@@ -17,16 +17,14 @@
   <div class="col-12">
     <label class="visually-hidden" for="q">Search</label>
     <input class="form-control" type="search" id="q" name="q" value="{{ filters.q or '' }}"
-           placeholder="Search by student name or number" autocomplete="off">
+           placeholder="Search by student name" autocomplete="off">
   </div>
   <div class="col-sm-6 col-lg">
     <label class="visually-hidden" for="student">Student</label>
     <select class="form-select" id="student" name="student">
       <option value="">All students</option>
       {% for s in students %}
-        <option value="{{ s.id }}" {{ "selected" if s.id == filters.student_id }}>
-          {{ s.full_name }} ({{ s.student_number }})
-        </option>
+        <option value="{{ s.id }}" {{ "selected" if s.id == filters.student_id }}>{{ s.name }}</option>
       {% endfor %}
     </select>
   </div>
@@ -36,6 +34,14 @@
       <option value="">Any status</option>
       <option value="active" {{ "selected" if filters.status == "active" }}>Active</option>
       <option value="revoked" {{ "selected" if filters.status == "revoked" }}>Revoked</option>
+    </select>
+  </div>
+  <div class="col-6 col-lg">
+    <label class="visually-hidden" for="motivated">Motivated</label>
+    <select class="form-select" id="motivated" name="motivated">
+      <option value="">Motivated or not</option>
+      <option value="no" {{ "selected" if filters.motivated == "no" }}>Not motivated yet</option>
+      <option value="yes" {{ "selected" if filters.motivated == "yes" }}>Motivated</option>
     </select>
   </div>
   <div class="col-6 col-lg">

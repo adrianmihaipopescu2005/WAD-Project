@@ -1,14 +1,11 @@
-from datetime import date
-
 import pytest
-from conftest import login
+from conftest import THURSDAY, TUESDAY, add_student, login
 
-from app.models import ROLE_ASSISTANT, STATUS_REVOKED, Absence, ApiKey, Student, User
+from app.models import ROLE_ASSISTANT, STATUS_REVOKED, Absence, ApiKey, User
 from app.services import validation
 
-TUESDAY = date(2026, 10, 27)
-THURSDAY = date(2026, 10, 29)
 URL = "/api/v1/validate"
+SID = 1  # the `student` fixture's id in a fresh database
 
 
 @pytest.fixture
@@ -18,17 +15,16 @@ def other(make_user):
 
 @pytest.fixture
 def student(db, assistant):
-    s = Student(assistant=assistant, student_number="LM1234", first_name="Ana", last_name="Pop")
-    db.session.add(s)
-    db.session.commit()
+    s = add_student(assistant, "Ana Pop")
+    assert s.id == SID
     return s
 
 
 @pytest.fixture
 def absence(db, student):
-    """Tuesday slot: covers 2026-10-27 and 2026-11-03."""
+    """Tuesday slot, motivated: covers 2026-10-27 and 2026-11-03."""
     a = Absence(student=student, slot="TUE_18_20", start_date=TUESDAY, sessions_count=2,
-                reason="Flu")
+                reason="Flu", motivated=True)
     db.session.add(a)
     db.session.commit()
     return a
@@ -47,19 +43,19 @@ def _get(client, key=None, **params):
 # --- authentication -----------------------------------------------------------------
 
 def test_requires_key_or_login(client, absence):
-    res = _get(client, student_number="LM1234", date="2026-10-27")
+    res = _get(client, student_id=SID, date="2026-10-27")
     assert res.status_code == 401
     assert "X-API-Key" in res.get_json()["error"]
 
 
 def test_invalid_key_rejected_even_when_logged_in(client, assistant, absence):
     login(client, assistant.email)
-    res = _get(client, key="lam_wrong", student_number="LM1234", date="2026-10-27")
+    res = _get(client, key="lam_wrong", student_id=SID, date="2026-10-27")
     assert res.status_code == 401
 
 
 def test_key_works_and_records_last_use(client, db, key, assistant, absence):
-    res = _get(client, key=key, student_number="LM1234", date="2026-10-27")
+    res = _get(client, key=key, student_id=SID, date="2026-10-27")
     assert res.status_code == 200
     db.session.expire_all()
     assert db.session.get(User, assistant.id).api_key.last_used_at is not None
@@ -67,7 +63,7 @@ def test_key_works_and_records_last_use(client, db, key, assistant, absence):
 
 def test_login_session_works_without_key(client, assistant, absence):
     login(client, assistant.email)
-    assert _get(client, student_number="LM1234", date="2026-10-27").get_json()["excused"] is True
+    assert _get(client, student_id=SID, date="2026-10-27").get_json()["excused"] is True
 
 
 def test_key_stored_hashed_only(db, key):
@@ -79,71 +75,87 @@ def test_key_stored_hashed_only(db, key):
 
 def test_regenerating_invalidates_old_key(client, db, assistant, key, absence):
     new_key = validation.generate_key(assistant)
-    assert _get(client, key=key, student_number="LM1234", date="2026-10-27").status_code == 401
-    assert _get(client, key=new_key, student_number="LM1234", date="2026-10-27").status_code == 200
+    assert _get(client, key=key, student_id=SID, date="2026-10-27").status_code == 401
+    assert _get(client, key=new_key, student_id=SID, date="2026-10-27").status_code == 200
     assert db.session.scalar(db.select(db.func.count(ApiKey.id))) == 1
 
 
 def test_revoked_key_rejected(client, assistant, key, absence):
     validation.revoke_key(assistant)
-    assert _get(client, key=key, student_number="LM1234", date="2026-10-27").status_code == 401
+    assert _get(client, key=key, student_id=SID, date="2026-10-27").status_code == 401
 
 
 # --- scoping ------------------------------------------------------------------------
 
 def test_other_assistants_student_looks_unknown(client, db, other, absence):
     other_key = validation.generate_key(other)
-    res = _get(client, key=other_key, student_number="LM1234", date="2026-10-27")
+    res = _get(client, key=other_key, student_id=SID, date="2026-10-27")
     assert res.status_code == 404
     assert res.get_json() == {"error": "Student not found."}
 
 
 def test_admin_key_sees_all_students(client, admin, absence):
     admin_key = validation.generate_key(admin)
-    res = _get(client, key=admin_key, student_number="LM1234", date="2026-10-27")
+    res = _get(client, key=admin_key, student_id=SID, date="2026-10-27")
     assert res.get_json()["excused"] is True
 
 
 # --- results ------------------------------------------------------------------------
 
 def test_excused_first_session(client, key, absence):
-    data = _get(client, key=key, student_number="LM1234", date="2026-10-27").get_json()
+    data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
     assert data == {
-        "student_number": "LM1234", "date": "2026-10-27", "lab_day": True,
-        "slot": "TUE_18_20", "slot_label": "Tuesday 18–20", "excused": True,
-        "absence_id": absence.id, "until": "2026-11-03",
+        "student_id": absence.student_id, "student_name": "Ana Pop", "date": "2026-10-27",
+        "lab_day": True, "slot": "TUE_18_20", "slot_label": "Tuesday 18–20", "excused": True,
+        "reported": True, "motivated": True, "absence_id": absence.id, "until": "2026-11-03",
     }
 
 
+def test_reported_but_not_motivated_is_not_excused(client, db, key, absence):
+    absence.motivated = False
+    db.session.commit()
+    data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
+    assert data["excused"] is False
+    assert data["reported"] is True and data["motivated"] is False
+    assert data["absence_id"] == absence.id
+
+
+def test_motivated_absence_wins_over_unreviewed_one(client, db, key, absence):
+    db.session.add(Absence(student_id=SID, slot="TUE_18_20",
+                           start_date=TUESDAY, reason="dup"))
+    db.session.commit()
+    data = _get(client, key=key, student_id=SID, date="2026-10-27").get_json()
+    assert data["excused"] is True and data["absence_id"] == absence.id
+
+
 def test_excused_second_week(client, key, absence):
-    assert _get(client, key=key, student_number="LM1234", date="2026-11-03").get_json()["excused"]
+    assert _get(client, key=key, student_id=SID, date="2026-11-03").get_json()["excused"]
 
 
 @pytest.mark.parametrize("day", ["2026-11-10", "2026-10-20"])  # after the end / before the start
 def test_not_excused_outside_covered_weeks(client, key, absence, day):
-    data = _get(client, key=key, student_number="LM1234", date=day).get_json()
+    data = _get(client, key=key, student_id=SID, date=day).get_json()
     assert data["excused"] is False and data["absence_id"] is None and data["lab_day"] is True
 
 
 def test_other_slot_day_not_excused(client, key, absence):
-    data = _get(client, key=key, student_number="LM1234", date=THURSDAY.isoformat()).get_json()
+    data = _get(client, key=key, student_id=SID, date=THURSDAY.isoformat()).get_json()
     assert data["slot"] == "THU_18_20" and data["excused"] is False
 
 
 def test_revoked_absence_not_excused(client, db, key, absence):
     absence.status = STATUS_REVOKED
     db.session.commit()
-    assert _get(client, key=key, student_number="LM1234", date="2026-10-27").get_json()["excused"] \
-        is False
+    assert _get(client, key=key, student_id=SID, date="2026-10-27").get_json()["excused"] is False
 
 
 def test_non_lab_day(client, key, absence):
-    data = _get(client, key=key, student_number="LM1234", date="2026-10-28").get_json()  # Wed
+    data = _get(client, key=key, student_id=SID, date="2026-10-28").get_json()  # Wed
     assert data["lab_day"] is False and data["slot"] is None and data["excused"] is False
 
 
 def test_student_without_absences(client, key, student):
-    data = _get(client, key=key, student_number="LM1234", date="2026-10-27").get_json()
+    data = _get(client, key=key, student_id=student.id, date="2026-10-27").get_json()
     assert data["excused"] is False
 
 
@@ -151,11 +163,12 @@ def test_student_without_absences(client, key, student):
 
 @pytest.mark.parametrize(
     ("params", "status", "message"),
-    [({"date": "2026-10-27"}, 400, "student_number is required"),
-     ({"student_number": "LM1234"}, 400, "YYYY-MM-DD"),
-     ({"student_number": "LM1234", "date": "27.10.2026"}, 400, "YYYY-MM-DD"),
-     ({"student_number": "LM1234", "date": "2026-02-30"}, 400, "YYYY-MM-DD"),
-     ({"student_number": "NOPE", "date": "2026-10-27"}, 404, "Student not found")],
+    [({"date": "2026-10-27"}, 400, "student_id is required"),
+     ({"student_id": "abc", "date": "2026-10-27"}, 400, "student_id must be a number"),
+     ({"student_id": "1"}, 400, "YYYY-MM-DD"),
+     ({"student_id": "1", "date": "27.10.2026"}, 400, "YYYY-MM-DD"),
+     ({"student_id": "1", "date": "2026-02-30"}, 400, "YYYY-MM-DD"),
+     ({"student_id": "999", "date": "2026-10-27"}, 404, "Student not found")],
 )
 def test_bad_requests(client, key, student, params, status, message):
     res = _get(client, key=key, **params)
@@ -182,7 +195,7 @@ def test_generate_key_shown_once(client, db, assistant):
     html = res.get_data(as_text=True)
     raw = html.split('id="new-key" value="')[1].split('"')[0]
     assert raw.startswith("lam_")
-    assert _get(client, key=raw, student_number="x", date="2026-10-27").status_code == 404  # valid
+    assert _get(client, key=raw, student_id="999", date="2026-10-27").status_code == 404  # valid
 
     html = client.get("/account/api-key").get_data(as_text=True)
     assert raw not in html and "Active" in html
@@ -213,21 +226,32 @@ def test_dashboard_widget_present(client, assistant):
 
 @pytest.mark.parametrize(
     ("params", "expected"),
-    [({"student_number": "LM1234", "date": "2026-10-27"}, 'data-result="excused"'),
-     ({"student_number": "LM1234", "date": "2026-11-10"}, 'data-result="not-excused"'),
-     ({"student_number": "LM1234", "date": "2026-10-28"}, 'data-result="no-lab"'),
-     ({"student_number": "NOPE", "date": "2026-10-27"}, "Student not found"),
-     ({"student_number": "LM1234", "date": "bad"}, "YYYY-MM-DD")],
+    [({"student_id": "1", "date": "2026-10-27"}, 'data-result="excused"'),
+     ({"student_id": "1", "date": "2026-11-10"}, 'data-result="not-excused"'),
+     ({"student_id": "1", "date": "2026-10-28"}, 'data-result="no-lab"'),
+     ({"student_id": "999", "date": "2026-10-27"}, "Student not found"),
+     ({"student_id": "1", "date": "bad"}, "YYYY-MM-DD")],
 )
 def test_dashboard_widget_without_js(client, assistant, absence, params, expected):
+    assert absence.student_id == 1  # the ids in the parameters
     login(client, assistant.email)
     html = client.get("/dashboard/", query_string=params).get_data(as_text=True)
     assert expected in html
 
 
+def test_dashboard_widget_not_motivated(client, db, assistant, absence):
+    absence.motivated = False
+    db.session.commit()
+    login(client, assistant.email)
+    html = client.get(
+        "/dashboard/", query_string={"student_id": absence.student_id, "date": "2026-10-27"}
+    ).get_data(as_text=True)
+    assert 'data-result="not-motivated"' in html
+
+
 def test_dashboard_widget_scoped(client, other, absence):
     login(client, other.email)
     html = client.get(
-        "/dashboard/", query_string={"student_number": "LM1234", "date": "2026-10-27"}
+        "/dashboard/", query_string={"student_id": absence.student_id, "date": "2026-10-27"}
     ).get_data(as_text=True)
     assert "Student not found" in html

@@ -6,9 +6,8 @@ from ...models import SLOTS
 from ...services import absences as service
 from ...services.assistants import list_assistants
 from ...services.auth import safe_next_url
-from ...services.students import get_student, visible_students
+from ...services.teams import visible_students
 from ...utils import wants_json
-from .forms import AbsenceForm
 
 bp = Blueprint("absences", __name__, url_prefix="/absences")
 
@@ -25,6 +24,7 @@ def _filters():
         "slot": args.get("slot") or None,
         "q": args.get("q", "").strip() or None,
         "assistant_id": args.get("assistant", type=int) if current_user.is_admin else None,
+        "motivated": args.get("motivated") or None,
     }
 
 
@@ -59,40 +59,15 @@ def search():
     return {"count": len(ctx["absences"]), "html": render_template("absences/_results.html", **ctx)}
 
 
-@bp.route("/new", methods=["GET", "POST"])
-@staff_required
-def new():
-    students = visible_students(current_user)
-    if not students:
-        flash("Add a student before adding absences.", "warning")
-        return redirect(url_for("students.new"))
-
-    form = AbsenceForm()
-    form.student_id.choices = [(s.id, f"{s.full_name} ({s.student_number})") for s in students]
-    if request.method == "GET" and (preselect := request.args.get("student_id", type=int)):
-        form.student_id.data = preselect
-
-    if form.validate_on_submit():
-        student = get_student(current_user, form.student_id.data) or abort(404)
-        try:
-            service.create_absence(
-                student, form.slot.data, form.start_date.data,
-                form.sessions_count.data, form.reason.data,
-            )
-        except service.AbsenceError as e:
-            form.start_date.errors.append(str(e))
-        else:
-            flash(f"Absence added for {student.full_name}.", "success")
-            return redirect(url_for("students.profile", student_id=student.id))
-    return render_template("absences/form.html", form=form)
-
-
 def _back():
     return redirect(safe_next_url(request.form.get("next")) or url_for("absences.index"))
 
 
 def _action_done(absence, message):
-    """Answer a revoke/extend: JSON with the re-rendered row for fetch(), else redirect back."""
+    """Answer a revoke/extend/motivated action.
+
+    fetch() gets JSON with the re-rendered row; a plain form post redirects back.
+    """
     if not wants_json():
         flash(message, "success")
         return _back()
@@ -107,6 +82,7 @@ def _action_done(absence, message):
         "absence": {
             "id": absence.id,
             "status": absence.status,
+            "motivated": absence.motivated,
             "sessions_count": absence.sessions_count,
             "end_date": absence.end_date.isoformat(),
         },
@@ -145,3 +121,17 @@ def extend(absence_id):
         f"Absence of {absence.student.full_name} extended to {absence.sessions_count} session(s),"
         f" until {absence.end_date.isoformat()}.",
     )
+
+
+@bp.post("/<int:absence_id>/motivated")
+@staff_required
+def motivated(absence_id):
+    """Tick or untick "motivated". The form sends the new value: motivated=1 or 0."""
+    absence = _absence_or_404(absence_id)
+    value = request.form.get("motivated") == "1"
+    try:
+        service.set_motivated(absence, value)
+    except service.AbsenceError as e:
+        return _action_failed(e)
+    state = "motivated" if value else "not motivated"
+    return _action_done(absence, f"Absence of {absence.student.full_name} marked {state}.")

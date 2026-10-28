@@ -1,9 +1,9 @@
 # STEP: current progress
 
-Updated: 2026-10-26. The full plan and the per-milestone log are in `MILESTONES.md`.
+Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M8: Polish + submission.** Done and pushed. **All milestones M0–M8 are complete.**
+**M9: Teams, deadline and "motivated".** Done locally, **not committed or deployed yet**. M0–M8 are done and pushed; the app is hosted on PythonAnywhere (M8 version).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -49,9 +49,17 @@ Updated: 2026-10-26. The full plan and the per-milestone log are in `MILESTONES.
   - 242 tests pass.
 
 - **Restyle (after M8):** "modern clean" theme, dark mode toggle, icons, new home page, subtle animations. Checked in Chrome.
+- **M9:**
+  - Teams of 2 with a fixed slot replace student numbers. Public form: pick team, then name. Deadline: 23:59 the day before (Romanian time).
+  - "Motivated" toggle for admin/assistant; only motivated absences excuse a student. Staff create page removed.
+  - Teams page, `flask import-teams` (real list in git-ignored `backend/instance/teams.txt`, 38 teams), seed with Darian.
+  - 243 tests pass. The new public-form JS hasn't been tried in a real browser yet.
 
-## Next (optional)
-- Screenshots in the README (not added yet).
+## Next
+- Try the new public form and the Motivated toggle in a browser.
+- Commit + push M9, then on PythonAnywhere: pull, recreate the DB (schema changed), add Darian, upload `teams.txt`, `import-teams`, reload.
+- Darian's real email (placeholder `darian@lab.local` in the demo).
+- Optional: screenshots in the README.
 - Anything the course or the lab assistant asks for after a demo.
 
 ## Blocked / open questions
@@ -63,13 +71,14 @@ Updated: 2026-10-26. The full plan and the per-milestone log are in `MILESTONES.
 - The API checks whether a student is excused on a given date.
 - Stack: Flask + Bootstrap 5 + SQLite. Milestones are tracked in `MILESTONES.md` + git, and the current state here in `STEP.md`.
 - Dynamic features, a course requirement (decided 2026-10-23): revoke/extend in place, live search, smart absence form, excused-check widget. Vanilla JS `fetch` + JSON, progressive enhancement. See `adr/shared/shared-dynamic-features.md`.
-- Public form (decided 2026-10-26): matched by student number to the registered student and their assistant. Unknown numbers are rejected, and the form never creates students. The lookup shows initials and group only.
+- Public form (decided 2026-10-28, replaces the 2026-10-26 student-number matching): students pick their team, then their name. Teams have a fixed slot and one assistant (Darian). The form never creates students.
+- Deadline (decided 2026-10-28): report by 23:59 the day before, Europe/Bucharest. Replaces the 30-days-back window.
+- "Motivated" (decided 2026-10-28): ticked by admin or assistant; only active + motivated absences excuse. Staff don't create absences.
 - Templates/static live in `frontend/`, and the Flask app in `backend/app/`.
-- Removing an assistant reassigns their students to another assistant chosen by the admin (decided 2026-10-23). The DB keeps `ON DELETE RESTRICT` as a safety net.
-- Date window (decided 2026-10-26): an absence starts at most 30 days back and about 6 months ahead.
+- Removing an assistant reassigns their teams to another assistant chosen by the admin (decided 2026-10-23). The DB keeps `ON DELETE RESTRICT` as a safety net.
 - Public pages: an in-memory per-IP rate limit and a generic duplicate message (decided 2026-10-26).
 - Validation API access: an API key, hashed and shown once (decided 2026-10-26).
-- Deleting a student also deletes their absences (CASCADE). Revoking an absence never deletes it.
+- Deleting a team also deletes its students and their absences (CASCADE). Revoking an absence never deletes it.
 
 ## How to run (from `backend/`)
 ```

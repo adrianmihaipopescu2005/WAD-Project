@@ -18,15 +18,15 @@ SLOTS = {
 # One semester has 14 weekly sessions per slot.
 MAX_SESSIONS = 14
 
-# An absence may start at most this many days before / after today (decided 2026-10-26).
-DAYS_BACK = 30
+# A student reports at the latest the day before the session (decided 2026-10-28),
+# and at most this many days ahead.
 DAYS_AHEAD = 183
+
+# A team has one or two students (decided 2026-10-28).
+TEAM_SIZE = 2
 
 STATUS_ACTIVE = "active"
 STATUS_REVOKED = "revoked"
-
-SOURCE_PUBLIC = "public"
-SOURCE_ASSISTANT = "assistant"
 
 
 def _now():
@@ -48,7 +48,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), nullable=False, default=ROLE_ASSISTANT)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
 
-    students = db.relationship("Student", back_populates="assistant")
+    teams = db.relationship("Team", back_populates="assistant")
     api_key = db.relationship(
         "ApiKey", back_populates="user", uselist=False,
         cascade="all, delete-orphan", passive_deletes=True,
@@ -65,30 +65,69 @@ class User(UserMixin, db.Model):
         return self.role == ROLE_ADMIN
 
 
-class Student(db.Model):
-    """A student (WAD "customer"). Belongs to exactly one assistant and has no login."""
+def _slot_check(name):
+    return CheckConstraint(
+        "slot IN (" + ", ".join(f"'{s}'" for s in SLOTS) + ")", name=name
+    )
 
-    __tablename__ = "students"
+
+class Team(db.Model):
+    """A lab team of one or two students. Has a fixed slot and belongs to one assistant."""
+
+    __tablename__ = "teams"
+    __table_args__ = (_slot_check("ck_teams_slot"),)
 
     id = db.Column(db.Integer, primary_key=True)
     assistant_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    student_number = db.Column(db.String(32), unique=True, nullable=False)
-    first_name = db.Column(db.String(80), nullable=False)
-    last_name = db.Column(db.String(80), nullable=False)
-    email = db.Column(db.String(255))
-    study_group = db.Column(db.String(32))
+    slot = db.Column(db.String(16), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
 
-    assistant = db.relationship("User", back_populates="students")
+    assistant = db.relationship("User", back_populates="teams")
+    members = db.relationship(
+        "Student", back_populates="team", order_by="Student.id",
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
+
+    @property
+    def slot_label(self):
+        return SLOTS[self.slot][0]
+
+    @property
+    def label(self):
+        """Teams have no names, so they are shown by their members."""
+        return " & ".join(m.name for m in self.members) or f"Team #{self.id}"
+
+
+class Student(db.Model):
+    """A student (WAD "customer"). Belongs to exactly one team and has no login."""
+
+    __tablename__ = "students"
+
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(
+        db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(160), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
+
+    team = db.relationship("Team", back_populates="members")
     absences = db.relationship(
         "Absence", back_populates="student", cascade="all, delete-orphan", passive_deletes=True
     )
 
     @property
     def full_name(self):
-        return f"{self.first_name} {self.last_name}"
+        return self.name
+
+    @property
+    def initials(self):
+        return "".join(part[:1].upper() for part in self.name.split()[:2])
+
+    @property
+    def teammates(self):
+        return [m for m in self.team.members if m.id != self.id]
 
 
 class Absence(db.Model):
@@ -96,9 +135,7 @@ class Absence(db.Model):
 
     __tablename__ = "absences"
     __table_args__ = (
-        CheckConstraint(
-            "slot IN (" + ", ".join(f"'{s}'" for s in SLOTS) + ")", name="ck_absences_slot"
-        ),
+        _slot_check("ck_absences_slot"),
         # SQLite strftime('%w'): Sunday = 0, so Tuesday = 2 and Thursday = 4.
         CheckConstraint(
             "(slot = 'TUE_18_20' AND strftime('%w', start_date) = '2')"
@@ -108,9 +145,6 @@ class Absence(db.Model):
         CheckConstraint("sessions_count >= 1", name="ck_absences_sessions_count"),
         CheckConstraint(
             f"status IN ('{STATUS_ACTIVE}', '{STATUS_REVOKED}')", name="ck_absences_status"
-        ),
-        CheckConstraint(
-            f"source IN ('{SOURCE_PUBLIC}', '{SOURCE_ASSISTANT}')", name="ck_absences_source"
         ),
     )
 
@@ -123,7 +157,8 @@ class Absence(db.Model):
     sessions_count = db.Column(db.Integer, nullable=False, default=1)
     reason = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(16), nullable=False, default=STATUS_ACTIVE)
-    source = db.Column(db.String(16), nullable=False, default=SOURCE_ASSISTANT)
+    # Ticked by staff after checking the reason. Only a motivated absence excuses the student.
+    motivated = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
     revoked_at = db.Column(db.DateTime(timezone=True))
 
@@ -139,11 +174,15 @@ class Absence(db.Model):
         return self.start_date + timedelta(weeks=self.sessions_count - 1)
 
     def covers(self, day: date) -> bool:
-        """True if this absence excuses the student from the lab session on `day`."""
+        """True if this (active) absence is for the lab session on `day`. Ignores `motivated`."""
         if self.status != STATUS_ACTIVE or day.weekday() != SLOTS[self.slot][1]:
             return False
         weeks = (day - self.start_date).days // 7
         return 0 <= weeks < self.sessions_count
+
+    def excuses(self, day: date) -> bool:
+        """True if the student is excused from the session on `day`: covered and motivated."""
+        return self.motivated and self.covers(day)
 
 
 class ApiKey(db.Model):

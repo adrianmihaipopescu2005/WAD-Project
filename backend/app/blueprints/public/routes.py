@@ -1,4 +1,4 @@
-from flask import Blueprint, redirect, render_template, request, session, url_for
+from flask import Blueprint, redirect, render_template, session, url_for
 
 from ...models import SLOTS
 from ...ratelimit import rate_limit
@@ -11,28 +11,27 @@ bp = Blueprint("public", __name__, url_prefix="/report")
 @bp.route("/", methods=["GET", "POST"])
 @rate_limit("report", limit=10, methods=("POST",))
 def report():
-    """Students report an absence without logging in."""
+    """Students report an absence without logging in: pick the team, then their own name."""
+    teams = service.public_teams()
     form = PublicAbsenceForm()
+    form.student_id.choices = [(m.id, m.name) for t in teams for m in t.members]
     if form.validate_on_submit():
         try:
             absence = service.submit_public(
-                form.student_number.data, form.slot.data, form.start_date.data,
-                form.sessions_count.data, form.reason.data,
+                form.student_id.data, form.start_date.data, form.reason.data,
             )
         except service.AbsenceError as e:
-            field = form.student_number if e.status == 404 else form.start_date
+            field = form.student_id if e.status == 404 else form.start_date
             field.errors.append(str(e))
         else:
-            # Shown once on the confirmation page. Initials only, like the lookup.
+            # Shown once on the confirmation page.
             session["last_report"] = {
-                "initials": service.public_lookup(absence.student.student_number)["initials"],
+                "name": absence.student.name,
                 "slot": absence.slot_label,
-                "start": absence.start_date.isoformat(),
-                "end": absence.end_date.isoformat(),
-                "sessions": absence.sessions_count,
+                "date": absence.start_date.isoformat(),
             }
             return redirect(url_for("public.thanks"))
-    return render_template("public/report.html", form=form, slots=SLOTS)
+    return render_template("public/report.html", form=form, teams=teams, slots=SLOTS)
 
 
 @bp.get("/thanks")
@@ -41,10 +40,3 @@ def thanks():
     if summary is None:
         return redirect(url_for("public.report"))
     return render_template("public/thanks.html", summary=summary)
-
-
-@bp.get("/lookup.json")
-@rate_limit("lookup", limit=30)
-def lookup():
-    """Smart form: confirms a student number while typing. Reveals initials and group only."""
-    return service.public_lookup(request.args.get("student_number", ""))

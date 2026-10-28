@@ -1,12 +1,11 @@
-{#- One absence row. Rendered in tables and returned by revoke/extend for in-place updates.
+{#- One absence row. Rendered in tables and returned by revoke/extend/motivated for in-place updates.
     Needs: a (Absence), show_student (bool), next_url (where non-JS posts redirect back). -#}
-{% from "_macros/absences.html" import status_badge, source_label %}
+{% from "_macros/absences.html" import status_badge %}
 {% set max_extra = max_sessions - a.sessions_count %}
-<tr id="absence-{{ a.id }}" data-status="{{ a.status }}" tabindex="-1">
+<tr id="absence-{{ a.id }}" data-status="{{ a.status }}" data-motivated="{{ 'yes' if a.motivated else 'no' }}" tabindex="-1">
   {% if show_student %}
     <td>
-      <a href="{{ url_for('students.profile', student_id=a.student.id) }}">{{ a.student.full_name }}</a>
-      <div class="small text-body-secondary">{{ a.student.student_number }}</div>
+      <a href="{{ url_for('teams.profile', student_id=a.student.id) }}">{{ a.student.name }}</a>
     </td>
   {% endif %}
   <td class="text-nowrap">{{ a.slot_label }}</td>
@@ -14,7 +13,23 @@
   <td class="text-nowrap" data-field="end_date">{{ a.end_date.isoformat() }}</td>
   <td class="text-end" data-field="sessions">{{ a.sessions_count }}</td>
   <td class="text-break">{{ a.reason }}</td>
-  <td>{{ source_label(a) }}</td>
+  <td>
+    {# A toggle: posts the opposite value. absence-actions.js sends it with fetch. #}
+    <form class="js-absence-action" method="post"
+          action="{{ url_for('absences.motivated', absence_id=a.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">
+      <input type="hidden" name="motivated" value="{{ '0' if a.motivated else '1' }}">
+      <button type="submit" class="btn btn-sm text-nowrap {{ 'btn-success' if a.motivated else 'btn-outline-secondary' }}"
+              aria-pressed="{{ 'true' if a.motivated else 'false' }}"
+              {{ "disabled" if a.status != "active" }}
+              title="{{ 'Click to unmark' if a.motivated else 'Click after checking the reason' }}">
+        <i class="bi bi-{{ 'check-square-fill' if a.motivated else 'square' }}" aria-hidden="true"></i>
+        Motivated
+      </button>
+    </form>
+  </td>
   <td>{{ status_badge(a) }}</td>
   <td class="text-end">
     {% if a.status == "active" %}
@@ -33,7 +48,7 @@
         </form>
         <form class="js-absence-action" method="post"
               action="{{ url_for('absences.revoke', absence_id=a.id) }}"
-              data-confirm="Revoke this absence of {{ a.student.full_name }}?">
+              data-confirm="Revoke this absence of {{ a.student.name }}?">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="next" value="{{ next_url }}">
           <input type="hidden" name="show_student" value="{{ '1' if show_student else '0' }}">

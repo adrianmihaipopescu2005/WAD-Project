@@ -13,57 +13,58 @@
     <h1 class="h3 mb-1"><i class="bi bi-send text-accent" aria-hidden="true"></i> Report an absence</h1>
     <p class="text-body-secondary">
       Mobile Systems and Applications lab · Tuesday and Thursday 18–20.
-      Your lab assistant will see this report.
+      Report it by <strong>23:59 the day before</strong> (Monday for Tuesday, Wednesday for Thursday).
     </p>
 
-    <form method="post" novalidate id="report-form" class="form-card"
-          data-lookup-endpoint="{{ url_for('public.lookup') }}">
+    {% if not teams %}
+      <div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i>
+        <p>No teams have been added yet. Contact your lab assistant.</p></div>
+    {% else %}
+    <form method="post" novalidate id="report-form" class="form-card">
       {{ form.hidden_tag() }}
 
+      {# Without JS: one dropdown grouped by team. smart-form.js turns it into
+         "pick your team" + "which one are you?". #}
+      <div class="mb-3" id="student-field">
+        {{ form.student_id.label(class="form-label") }}
+        <select class="form-select{{ ' is-invalid' if form.student_id.errors }}"
+                id="student_id" name="student_id" required>
+          <option value="">Choose your name…</option>
+          {% for team in teams %}
+            {% set label, weekday = slots[team.slot] %}
+            {# data-weekday uses JavaScript numbering: Sunday = 0. #}
+            <optgroup label="{{ label.split()[0] }}: {{ team.label }}" data-team="{{ team.id }}"
+                      data-team-label="{{ team.label }}" data-slot-label="{{ label }}"
+                      data-weekday="{{ (weekday + 1) % 7 }}" data-day-name="{{ label.split()[0] }}">
+              {% for m in team.members %}
+                <option value="{{ m.id }}" {{ "selected" if form.student_id.data == m.id }}>{{ m.name }}</option>
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+        {{ errors(form.student_id) }}
+        <div class="form-text">Find your team (listed by day), then pick your own name.</div>
+      </div>
+
       <div class="mb-3">
-        {{ form.student_number.label(class="form-label") }}
-        {{ form.student_number(class="form-control" ~ (" is-invalid" if form.student_number.errors else ""),
-                               autocomplete="off", **{"aria-describedby": "student_number-help lookup-status"}) }}
-        {{ errors(form.student_number) }}
-        <div id="student_number-help" class="form-text">{{ form.student_number.description }}</div>
-        <div id="lookup-status" class="form-text" aria-live="polite"></div>
-      </div>
-
-      <div class="row">
-        <div class="col-sm-6 mb-3">
-          {{ form.slot.label(class="form-label") }}
-          <select class="form-select{{ ' is-invalid' if form.slot.errors }}" id="slot" name="slot" required>
-            {% for code, (label, weekday) in slots.items() %}
-              {# data-weekday uses JavaScript numbering: Sunday = 0. #}
-              <option value="{{ code }}" data-weekday="{{ (weekday + 1) % 7 }}"
-                      data-day-name="{{ label.split()[0] }}"
-                      {{ "selected" if form.slot.data == code }}>{{ label }}</option>
-            {% endfor %}
-          </select>
-          {{ errors(form.slot) }}
-        </div>
-        <div class="col-sm-6 mb-3">
-          {{ form.start_date.label(class="form-label") }}
-          {% set earliest, latest = date_window() %}
-          {{ form.start_date(class="form-control" ~ (" is-invalid" if form.start_date.errors else ""),
-                             type="date", min=earliest.isoformat(), max=latest.isoformat(),
-                             **{"aria-describedby": "start_date-help start_date-js-error"}) }}
-          {{ errors(form.start_date) }}
-          <div class="invalid-feedback" id="start_date-js-error" hidden></div>
-          <div id="start_date-help" class="form-text">
-            {{ form.start_date.description }}
-            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="next-session" hidden></button>
-          </div>
+        {{ form.start_date.label(class="form-label") }}
+        {% set earliest, latest = date_window() %}
+        {{ form.start_date(class="form-control" ~ (" is-invalid" if form.start_date.errors else ""),
+                           type="date", min=earliest.isoformat(), max=latest.isoformat(),
+                           **{"aria-describedby": "start_date-help start_date-js-error"}) }}
+        {{ errors(form.start_date) }}
+        <div class="invalid-feedback" id="start_date-js-error" hidden></div>
+        <div id="start_date-help" class="form-text">
+          {{ form.start_date.description }}
+          <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="next-session" hidden></button>
         </div>
       </div>
-
-      {{ render_field(form.sessions_count, type="number", min=1, max=max_sessions) }}
-      <div id="coverage" class="alert alert-info py-2" aria-live="polite" hidden></div>
 
       {{ render_field(form.reason, rows=3, maxlength=500) }}
 
       {{ form.submit(class="btn btn-primary") }}
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

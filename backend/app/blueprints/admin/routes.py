@@ -48,6 +48,6 @@ def delete_assistant(assistant_id):
     except service.AssistantError as e:
         flash(str(e), "danger")
     else:
-        moved = f" Their students were moved to {target.name}." if target else ""
+        moved = f" Their teams were moved to {target.name}." if target else ""
         flash(f"Lab assistant {assistant.name} removed.{moved}", "success")
     return redirect(url_for("admin.assistants"))

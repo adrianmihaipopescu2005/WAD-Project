@@ -1,19 +1,13 @@
-from datetime import date
-
 import pytest
-from conftest import login
+from conftest import TUESDAY, add_student, login
 
 from app.models import ROLE_ASSISTANT, Absence, Student, User
 from app.services import assistants as service
 
-TUESDAY = date(2026, 10, 27)
 
-
-def _add_student(db, assistant, number):
-    s = Student(assistant=assistant, student_number=number, first_name="Ana", last_name=number)
-    db.session.add(s)
-    db.session.commit()
-    return s
+def _add_student(db, assistant, name):
+    """A student in their own team, so each call adds one team."""
+    return add_student(assistant, name)
 
 
 def _get(db, model, id_):
@@ -60,15 +54,15 @@ def test_list_empty_state(admin_client):
     assert "No lab assistants yet" in admin_client.get("/admin/assistants").get_data(as_text=True)
 
 
-def test_list_shows_assistants_with_student_counts(admin_client, db, admin, assistant, make_user):
+def test_list_shows_assistants_with_team_counts(admin_client, db, admin, assistant, make_user):
     other = make_user("other@example.com", ROLE_ASSISTANT)
     _add_student(db, assistant, "S1")
     _add_student(db, assistant, "S2")
     html = admin_client.get("/admin/assistants").get_data(as_text=True)
     assert assistant.email in html and other.email in html
     assert admin.email not in html  # admins are not listed as assistants
-    assert f'data-students="{assistant.id}">2<' in html
-    assert f'data-students="{other.id}">0<' in html
+    assert f'data-teams="{assistant.id}">2<' in html
+    assert f'data-teams="{other.id}">0<' in html
 
 
 # --- create -------------------------------------------------------------------------
@@ -114,13 +108,13 @@ def test_create_validation(admin_client, db, data, message):
 
 # --- remove -------------------------------------------------------------------------
 
-def test_remove_assistant_without_students(admin_client, db, assistant):
+def test_remove_assistant_without_teams(admin_client, db, assistant):
     res = admin_client.post(f"/admin/assistants/{assistant.id}/delete")
     assert res.status_code == 302
     assert _get(db, User, assistant.id) is None
 
 
-def test_remove_with_students_requires_target(admin_client, db, assistant, make_user):
+def test_remove_with_teams_requires_target(admin_client, db, assistant, make_user):
     make_user("other@example.com", ROLE_ASSISTANT)
     _add_student(db, assistant, "S1")
     res = admin_client.post(f"/admin/assistants/{assistant.id}/delete", follow_redirects=True)
@@ -128,7 +122,7 @@ def test_remove_with_students_requires_target(admin_client, db, assistant, make_
     assert _get(db, User, assistant.id) is not None
 
 
-def test_remove_reassigns_students_and_keeps_absences(admin_client, db, assistant, make_user):
+def test_remove_reassigns_teams_and_keeps_absences(admin_client, db, assistant, make_user):
     other = make_user("other@example.com", ROLE_ASSISTANT)
     s1 = _add_student(db, assistant, "S1")
     s2 = _add_student(db, assistant, "S2")
@@ -142,8 +136,8 @@ def test_remove_reassigns_students_and_keeps_absences(admin_client, db, assistan
     )
     assert "were moved to" in res.get_data(as_text=True)
     assert _get(db, User, assistant_id) is None
-    assert _get(db, Student, s1.id).assistant_id == other_id
-    assert _get(db, Student, s2.id).assistant_id == other_id
+    assert _get(db, Student, s1.id).team.assistant_id == other_id
+    assert _get(db, Student, s2.id).team.assistant_id == other_id
     assert len(_get(db, Student, s1.id).absences) == 1
 
 
@@ -153,7 +147,7 @@ def test_remove_invalid_target_rejected(admin_client, db, admin, assistant, targ
     target_id = {"self": assistant.id, "admin": admin.id, "missing": 999}[target]
     admin_client.post(f"/admin/assistants/{assistant.id}/delete", data={"reassign_to": target_id})
     assert _get(db, User, assistant.id) is not None
-    assert _get(db, Student, 1).assistant_id == assistant.id
+    assert _get(db, Student, 1).team.assistant_id == assistant.id
 
 
 def test_remove_admin_or_missing_is_404(admin_client, admin):
@@ -174,7 +168,7 @@ def test_remove_is_atomic(app, db, assistant, make_user, monkeypatch):
     monkeypatch.undo()
 
     assert _get(db, User, assistant.id) is not None
-    assert _get(db, Student, s.id).assistant_id == assistant.id  # UPDATE was rolled back
+    assert _get(db, Student, s.id).team.assistant_id == assistant.id  # UPDATE was rolled back
 
 
 def test_remove_modal_offers_only_other_assistants(admin_client, db, assistant, make_user):

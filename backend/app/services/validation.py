@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from ..extensions import db
 from ..models import SLOTS, STATUS_ACTIVE, Absence, ApiKey
 from . import commit_or_rollback
-from .absences import find_student_by_number
+from .teams import get_student
 
 KEY_PREFIX = "lam_"
 LAST_USED_RESOLUTION = timedelta(minutes=1)
@@ -89,25 +89,36 @@ def parse_day(value):
         raise ValidationError("date must be YYYY-MM-DD.") from None
 
 
-def check_excused(user, student_number, day):
+def parse_student_id(value):
+    value = (value or "").strip()
+    if not value:
+        raise ValidationError("student_id is required.")
+    if not value.isdigit():
+        raise ValidationError("student_id must be a number.")
+    return int(value)
+
+
+def check_excused(user, student_id, day):
     """The validation result for `user`, who must be allowed to see the student.
 
-    Another assistant's student gives the same 404 as an unknown number, so nothing leaks.
+    Another assistant's student gives the same 404 as an unknown id, so nothing leaks.
+    A student is excused only by an active absence that staff marked motivated.
     """
-    if not (student_number or "").strip():
-        raise ValidationError("student_number is required.")
-    student = find_student_by_number(student_number)
-    if student is None or not (user.is_admin or student.assistant_id == user.id):
+    student = get_student(user, student_id)
+    if student is None:
         raise ValidationError("Student not found.", 404)
 
     slot = next((code for code, (_label, wd) in SLOTS.items() if wd == day.weekday()), None)
     result = {
-        "student_number": student.student_number,
+        "student_id": student.id,
+        "student_name": student.name,
         "date": day.isoformat(),
         "lab_day": slot is not None,
         "slot": slot,
         "slot_label": SLOTS[slot][0] if slot else None,
         "excused": False,
+        "reported": False,
+        "motivated": False,
         "absence_id": None,
         "until": None,
     }
@@ -121,7 +132,11 @@ def check_excused(user, student_number, day):
             Absence.status == STATUS_ACTIVE,
         )
     ).scalars()
-    covering = next((a for a in absences if a.covers(day)), None)
-    if covering is not None:
-        result.update(excused=True, absence_id=covering.id, until=covering.end_date.isoformat())
+    covering = sorted((a for a in absences if a.covers(day)), key=lambda a: not a.motivated)
+    if covering:
+        a = covering[0]  # a motivated one wins over one still waiting for review
+        result.update(
+            excused=a.motivated, reported=True, motivated=a.motivated,
+            absence_id=a.id, until=a.end_date.isoformat(),
+        )
     return result

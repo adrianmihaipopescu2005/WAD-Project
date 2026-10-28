@@ -6,22 +6,20 @@ from .. import clock
 from ..extensions import db
 from ..models import (
     DAYS_AHEAD,
-    DAYS_BACK,
     MAX_SESSIONS,
     SLOTS,
-    SOURCE_ASSISTANT,
-    SOURCE_PUBLIC,
     STATUS_ACTIVE,
     STATUS_REVOKED,
     Absence,
     Student,
+    Team,
 )
 from . import commit_or_rollback
-from .students import search_clause
+from .teams import search_clause
 
 # Deliberately vague: it must not reveal whether a student is already absent on a date.
 DUPLICATE_PUBLIC_MESSAGE = (
-    "This report couldn't be recorded. If you already reported these sessions, there's nothing "
+    "This report couldn't be recorded. If you already reported this session, there's nothing "
     "more to do. Otherwise, contact your lab assistant."
 )
 
@@ -35,9 +33,12 @@ class AbsenceError(Exception):
 
 
 def date_window():
-    """The (earliest, latest) allowed start date of an absence."""
+    """The (earliest, latest) date a student may report: from tomorrow to about 6 months ahead.
+
+    "Tomorrow" means a session can be reported until 23:59 the day before (Romanian time).
+    """
     today = clock.today()
-    return today - timedelta(days=DAYS_BACK), today + timedelta(days=DAYS_AHEAD)
+    return today + timedelta(days=1), today + timedelta(days=DAYS_AHEAD)
 
 
 def slot_date_error(slot, day):
@@ -45,33 +46,43 @@ def slot_date_error(slot, day):
     if slot not in SLOTS:
         return "Choose a lab slot."
     label, weekday = SLOTS[slot]
+    day_name = label.split()[0]
     if day.weekday() != weekday:
-        return f"{day.isoformat()} is not a {label.split()[0]}. Pick a date on the slot's day."
+        return f"{day.isoformat()} is not a {day_name}. Your team's lab is on {day_name}s."
     earliest, latest = date_window()
-    if not earliest <= day <= latest:
+    if day < earliest:
         return (
-            f"Pick a date between {earliest.isoformat()} and {latest.isoformat()}"
-            f" (at most {DAYS_BACK} days ago and about 6 months ahead)."
+            f"Too late to report the {day.isoformat()} session. Absences must be reported by "
+            f"23:59 the day before ({(day - timedelta(days=1)).strftime('%A')} for {day_name})."
         )
+    if day > latest:
+        return f"Pick a date until {latest.isoformat()} (about 6 months ahead)."
     return None
 
 
 def _scoped(stmt, user):
-    stmt = stmt.join(Absence.student).options(contains_eager(Absence.student))
-    return stmt if user.is_admin else stmt.where(Student.assistant_id == user.id)
+    stmt = (
+        stmt.join(Absence.student).join(Student.team)
+        .options(contains_eager(Absence.student).contains_eager(Student.team))
+    )
+    return stmt if user.is_admin else stmt.where(Team.assistant_id == user.id)
 
 
-def list_absences(user, student_id=None, status=None, slot=None, q=None, assistant_id=None):
-    """Absences visible to `user` (an assistant: only their students'), newest first."""
+def list_absences(
+    user, student_id=None, status=None, slot=None, q=None, assistant_id=None, motivated=None
+):
+    """Absences visible to `user` (an assistant: only their teams'), newest first."""
     stmt = _scoped(db.select(Absence), user)
     if user.is_admin and assistant_id:
-        stmt = stmt.where(Student.assistant_id == assistant_id)
+        stmt = stmt.where(Team.assistant_id == assistant_id)
     if student_id:
         stmt = stmt.where(Absence.student_id == student_id)
     if status in (STATUS_ACTIVE, STATUS_REVOKED):
         stmt = stmt.where(Absence.status == status)
     if slot in SLOTS:
         stmt = stmt.where(Absence.slot == slot)
+    if motivated in ("yes", "no"):
+        stmt = stmt.where(Absence.motivated.is_(motivated == "yes"))
     if q:
         stmt = stmt.where(search_clause(q))
     stmt = stmt.order_by(Absence.start_date.desc(), Absence.id.desc())
@@ -82,25 +93,6 @@ def get_absence(user, absence_id):
     """The absence, or None if it doesn't exist or `user` may not see it."""
     stmt = _scoped(db.select(Absence).where(Absence.id == absence_id), user)
     return db.session.execute(stmt).scalar_one_or_none()
-
-
-def create_absence(student, slot, start_date, sessions_count, reason, source=SOURCE_ASSISTANT):
-    error = slot_date_error(slot, start_date)
-    if error:
-        raise AbsenceError(error, 400)
-    if not 1 <= sessions_count <= MAX_SESSIONS:
-        raise AbsenceError(f"Sessions must be between 1 and {MAX_SESSIONS}.", 400)
-    reason = (reason or "").strip()
-    if not reason:
-        raise AbsenceError("A reason is required.", 400)
-
-    absence = Absence(
-        student=student, slot=slot, start_date=start_date,
-        sessions_count=sessions_count, reason=reason, source=source,
-    )
-    db.session.add(absence)
-    commit_or_rollback()
-    return absence
 
 
 def revoke(absence):
@@ -124,24 +116,20 @@ def extend(absence, extra_sessions):
     commit_or_rollback()
 
 
+def set_motivated(absence, motivated):
+    """Tick or untick "motivated" after checking the reason."""
+    if absence.status != STATUS_ACTIVE:
+        raise AbsenceError("A revoked absence can't be marked motivated.")
+    absence.motivated = bool(motivated)
+    commit_or_rollback()
+
+
 # --- public (no login) ---------------------------------------------------------------
 
-def find_student_by_number(student_number):
-    number = (student_number or "").strip()
-    if not number:
-        return None
-    return db.session.execute(
-        db.select(Student).where(Student.student_number == number)
-    ).scalar_one_or_none()
-
-
-def public_lookup(student_number):
-    """What the public form may reveal about a student number: initials and group only."""
-    student = find_student_by_number(student_number)
-    if student is None:
-        return {"found": False}
-    initials = f"{student.first_name[:1].upper()}. {student.last_name[:1].upper()}."
-    return {"found": True, "initials": initials, "group": student.study_group}
+def public_teams():
+    """Every team with its members, for the public form: by slot, then in the order added."""
+    stmt = db.select(Team).order_by(Team.slot.desc(), Team.id)  # TUE_ before THU_
+    return [t for t in db.session.execute(stmt).scalars() if t.members]
 
 
 def _overlaps_active(student, slot, start_date, sessions_count):
@@ -153,13 +141,22 @@ def _overlaps_active(student, slot, start_date, sessions_count):
     return any(a.covers(day) for a in db.session.execute(stmt).scalars() for day in days)
 
 
-def submit_public(student_number, slot, start_date, sessions_count, reason):
-    """A student's own report. It goes to the assistant who registered their student number."""
-    student = find_student_by_number(student_number)
+def submit_public(student_id, start_date, reason):
+    """A student's own report of one session. The slot is their team's slot."""
+    student = db.session.get(Student, student_id) if student_id else None
     if student is None:
-        raise AbsenceError("Student number not found, contact your lab assistant.", 404)
-    if slot in SLOTS and 1 <= sessions_count <= MAX_SESSIONS and _overlaps_active(
-        student, slot, start_date, sessions_count
-    ):
+        raise AbsenceError("Choose your team and your name.", 404)
+    slot = student.team.slot
+    error = slot_date_error(slot, start_date)
+    if error:
+        raise AbsenceError(error, 400)
+    reason = (reason or "").strip()
+    if not reason:
+        raise AbsenceError("A reason is required.", 400)
+    if _overlaps_active(student, slot, start_date, 1):
         raise AbsenceError(DUPLICATE_PUBLIC_MESSAGE)
-    return create_absence(student, slot, start_date, sessions_count, reason, SOURCE_PUBLIC)
+
+    absence = Absence(student=student, slot=slot, start_date=start_date, reason=reason)
+    db.session.add(absence)
+    commit_or_rollback()
+    return absence

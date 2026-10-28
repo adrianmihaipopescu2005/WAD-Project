@@ -5,9 +5,11 @@ import pytest
 from app import clock, create_app
 from app.config import TestingConfig
 from app.extensions import db as _db
-from app.models import ROLE_ADMIN, ROLE_ASSISTANT, User
+from app.models import ROLE_ADMIN, ROLE_ASSISTANT, Student, Team, User
 
 TODAY = date(2026, 10, 26)  # a Monday; the tests' fixed dates are relative to it
+TUESDAY = date(2026, 10, 27)  # tomorrow: the earliest session a student may still report
+THURSDAY = date(2026, 10, 29)
 
 
 @pytest.fixture(autouse=True)
@@ -61,3 +63,17 @@ def assistant(app):
 
 def login(client, email, password="secret123", **query):
     return client.post("/login", query_string=query, data={"email": email, "password": password})
+
+
+def add_team(assistant, *names, slot="TUE_18_20"):
+    """A team of `names` (default: one student) owned by `assistant`."""
+    team = Team(assistant=assistant, slot=slot,
+                members=[Student(name=n) for n in (names or ("Ana Pop",))])
+    _db.session.add(team)
+    _db.session.commit()
+    return team
+
+
+def add_student(assistant, name="Ana Pop", slot="TUE_18_20"):
+    """A student in a one-person team owned by `assistant`."""
+    return add_team(assistant, name, slot=slot).members[0]

@@ -8,13 +8,16 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 - Stack: **Python + Flask** backend, **HTML/CSS/JavaScript + Bootstrap 5** frontend. No PHP, no Firebase, no NoSQL, no SPA frameworks (React/Vue/Angular).
 - Database: **SQLite** through Flask-SQLAlchemy. Relational only: every relation has a foreign key (`PRAGMA foreign_keys=ON`), and each multi-step write runs in one transaction.
 - Dynamic features (course requirement): vanilla JS `fetch` + JSON, with no page reload and progressive enhancement. See `adr/shared/shared-dynamic-features.md`.
-- Two logged-in roles only: `admin` (professor) and `assistant` (lab assistant). Students do **not** have accounts. They use the public absence form.
+- Two logged-in roles only: `admin` (professor) and `assistant` (lab assistant). Students do **not** have accounts. They use the public absence form, where they pick their team and then their own name. Staff don't enter absences.
 
 ## Invariants
-- An assistant sees and changes **only** their own students and those students' absences. An admin sees and changes everything.
+- Students are in **teams** (1–2 students, a fixed slot, one assistant). A student is in exactly one team.
+- An assistant sees and changes **only** their own teams, those teams' students and their absences. An admin sees and changes everything.
 - Only an admin can add or remove assistants.
 - `absences.slot` is one of `TUE_18_20`, `THU_18_20`, and `start_date` falls on that slot's weekday.
-- `start_date` is at most 30 days back and 183 days ahead of today (`DAYS_BACK`/`DAYS_AHEAD`, read through `app/clock.py` so tests can pin "today").
+- `absences.slot` is the student's team slot.
+- A student reports by 23:59 the day before the session (Romanian time): `start_date` is from tomorrow to `DAYS_AHEAD` (183) days ahead. "Today" comes from `app/clock.py` so tests can pin it.
+- `absences.motivated` is ticked by staff after checking the reason. Only an active, motivated absence excuses a student (validation API).
 - `absences.sessions_count >= 1`. "Extend" increases it, so the absence covers the next weekly sessions of the same slot.
 - `absences.status` is `active` or `revoked`. "Revoke" sets `revoked` and is never a hard delete.
 - Every role check is enforced server-side, not just hidden in the UI.
@@ -30,5 +33,6 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 - Install: `python -m venv .venv` then `.venv\Scripts\pip install -r requirements.txt`
 - Run: `.venv\Scripts\flask --app app run --debug`
 - Init DB + admin: `.venv\Scripts\flask --app app init-db`
+- Load teams: `.venv\Scripts\flask --app app import-teams instance\teams.txt` (real names: keep the file in the git-ignored `instance/`)
 - Tests: `.venv\Scripts\python -m pytest`
 - Lint: `.venv\Scripts\python -m ruff check .`

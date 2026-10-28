@@ -10,7 +10,10 @@
 
   // Builds the same markup as dashboard/_check_result.html, using textContent only.
   function render(kind, strong, text) {
-    const classes = { "excused": "success", "not-excused": "warning", "no-lab": "secondary", "error": "danger" };
+    const classes = {
+      "excused": "success", "not-motivated": "warning", "not-excused": "warning",
+      "no-lab": "secondary", "error": "danger",
+    };
     const box = document.createElement("div");
     box.className = `alert alert-${classes[kind]} mb-0`;
     box.dataset.result = kind;
@@ -35,9 +38,12 @@
         render("no-lab", "", `No lab session on ${r.date}. Labs are on Tuesdays and Thursdays.`);
       } else if (r.excused) {
         render("excused", "✓ Excused.",
-          `${r.student_number} on ${r.date} (${r.slot_label}), covered by absence #${r.absence_id} until ${r.until}.`);
+          `${r.student_name} on ${r.date} (${r.slot_label}), motivated absence #${r.absence_id}, until ${r.until}.`);
+      } else if (r.reported) {
+        render("not-motivated", "✗ Not excused yet.",
+          `${r.student_name} reported absence #${r.absence_id} for ${r.date} (${r.slot_label}), but it isn't marked motivated.`);
       } else {
-        render("not-excused", "✗ Not excused.", `${r.student_number} on ${r.date} (${r.slot_label}).`);
+        render("not-excused", "✗ Not excused.", `${r.student_name} on ${r.date} (${r.slot_label}).`);
       }
       history.replaceState(null, "", `${location.pathname}?${params}`);
     } catch (err) {

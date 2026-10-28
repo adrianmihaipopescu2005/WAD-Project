@@ -1,7 +1,7 @@
 from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
-from ..models import ROLE_ASSISTANT, Student, User
+from ..models import ROLE_ASSISTANT, Team, User
 from . import commit_or_rollback
 from .auth import normalize_email
 
@@ -13,16 +13,16 @@ class AssistantError(Exception):
 
 
 def list_assistants():
-    """All assistants, ordered by name, each paired with their student count."""
+    """All assistants, ordered by name, each paired with their team count."""
     count = (
-        db.select(db.func.count(Student.id))
-        .where(Student.assistant_id == User.id)
+        db.select(db.func.count(Team.id))
+        .where(Team.assistant_id == User.id)
         .scalar_subquery()
     )
     rows = db.session.execute(
         db.select(User, count).where(User.role == ROLE_ASSISTANT).order_by(User.name)
     ).all()
-    return [(user, students) for user, students in rows]
+    return [(user, teams) for user, teams in rows]
 
 
 def get_assistant(assistant_id):
@@ -50,25 +50,25 @@ def create_assistant(name, email, password):
 
 
 def remove_assistant(assistant, reassign_to=None):
-    """Delete `assistant`. Their students (and absences) first move to `reassign_to`, atomically.
+    """Delete `assistant`. Their teams (students, absences) first move to `reassign_to`, atomically.
 
-    `reassign_to` is required when the assistant has students.
+    `reassign_to` is required when the assistant has teams.
     """
-    has_students = db.session.execute(
-        db.select(Student.id).filter_by(assistant_id=assistant.id).limit(1)
+    has_teams = db.session.execute(
+        db.select(Team.id).filter_by(assistant_id=assistant.id).limit(1)
     ).first() is not None
 
     if reassign_to is not None:
         if reassign_to.role != ROLE_ASSISTANT or reassign_to.id == assistant.id:
-            raise AssistantError("Students must be moved to a different lab assistant.")
-    elif has_students:
-        raise AssistantError("Choose another assistant to take over this assistant's students.")
+            raise AssistantError("Teams must be moved to a different lab assistant.")
+    elif has_teams:
+        raise AssistantError("Choose another assistant to take over this assistant's teams.")
 
     try:
-        if has_students:
+        if has_teams:
             db.session.execute(
-                db.update(Student)
-                .where(Student.assistant_id == assistant.id)
+                db.update(Team)
+                .where(Team.assistant_id == assistant.id)
                 .values(assistant_id=reassign_to.id)
             )
         db.session.delete(assistant)

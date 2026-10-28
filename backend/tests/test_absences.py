@@ -1,7 +1,5 @@
-from datetime import date
-
 import pytest
-from conftest import login
+from conftest import THURSDAY, TUESDAY, add_student, login
 
 from app import create_app
 from app.config import TestingConfig
@@ -9,30 +7,21 @@ from app.extensions import db as _db
 from app.models import (
     MAX_SESSIONS,
     ROLE_ASSISTANT,
-    SOURCE_ASSISTANT,
     STATUS_ACTIVE,
     STATUS_REVOKED,
     Absence,
     Student,
+    Team,
     User,
 )
 
-TUESDAY = date(2026, 10, 27)
-THURSDAY = date(2026, 10, 29)
 JSON = {"Accept": "application/json"}
 
 
-def _student(db, assistant, number, first="Ana", last="Pop"):
-    s = Student(assistant=assistant, student_number=number, first_name=first, last_name=last)
-    db.session.add(s)
-    db.session.commit()
-    return s
-
-
 def _absence(db, student, slot="TUE_18_20", start=TUESDAY, sessions=1, status=STATUS_ACTIVE,
-             reason="Doctor"):
+             reason="Doctor", motivated=False):
     a = Absence(student=student, slot=slot, start_date=start, sessions_count=sessions,
-                status=status, reason=reason)
+                status=status, reason=reason, motivated=motivated)
     db.session.add(a)
     db.session.commit()
     return a
@@ -62,26 +51,24 @@ def as_admin(client, admin):
 
 @pytest.fixture
 def mine(db, assistant):
-    return _student(db, assistant, "MINE1", "Mine", "Student")
+    return add_student(assistant, "Mine Student")
 
 
 @pytest.fixture
 def theirs(db, other):
-    return _student(db, other, "THEIRS1", "Their", "Student")
-
-
-def _new(student, **override):
-    return {
-        "student_id": student.id, "slot": "TUE_18_20", "start_date": TUESDAY.isoformat(),
-        "sessions_count": 1, "reason": "Medical appointment", **override,
-    }
+    return add_student(other, "Their Student")
 
 
 # --- access & scoping ---------------------------------------------------------------
 
-@pytest.mark.parametrize("url", ["/absences/", "/absences/new", "/absences/search.json"])
+@pytest.mark.parametrize("url", ["/absences/", "/absences/search.json"])
 def test_anonymous_redirected(client, url):
     assert "/login" in client.get(url).headers["Location"]
+
+
+def test_staff_cannot_create_absences(as_assistant):
+    """Only students report absences (public form). There is no staff create page."""
+    assert as_assistant.get("/absences/new").status_code == 404
 
 
 def test_list_scoped_to_own_students(as_assistant, db, mine, theirs):
@@ -107,30 +94,26 @@ def test_assistant_assistant_filter_is_ignored(as_assistant, db, mine, theirs, o
     assert "their-reason" not in html
 
 
-@pytest.mark.parametrize("action", ["revoke", "extend"])
+@pytest.mark.parametrize("action", ["revoke", "extend", "motivated"])
 @pytest.mark.parametrize("headers", [{}, JSON])
 def test_cannot_act_on_other_assistants_absence(as_assistant, db, theirs, action, headers):
     a = _absence(db, theirs)
-    res = as_assistant.post(f"/absences/{a.id}/{action}", data={"sessions": 1}, headers=headers)
+    res = as_assistant.post(
+        f"/absences/{a.id}/{action}", data={"sessions": 1, "motivated": "1"}, headers=headers
+    )
     assert res.status_code == 404
     if headers:
         assert "error" in res.get_json()
     a = _reload(db, a.id)
-    assert a.status == STATUS_ACTIVE and a.sessions_count == 1
-
-
-def test_cannot_create_for_other_assistants_student(as_assistant, db, mine, theirs):
-    res = as_assistant.post("/absences/new", data=_new(theirs))
-    assert res.status_code == 200  # not a valid choice for this assistant
-    assert db.session.execute(db.select(Absence)).first() is None
+    assert a.status == STATUS_ACTIVE and a.sessions_count == 1 and not a.motivated
 
 
 # --- filters ------------------------------------------------------------------------
 
 def test_filters(as_assistant, db, assistant, mine):
-    second = _student(db, assistant, "S2", "Ion", "Ionescu")
+    second = add_student(assistant, "Ion Ionescu")
     _absence(db, mine, reason="tue-active")
-    _absence(db, mine, slot="THU_18_20", start=THURSDAY, reason="thu-active")
+    _absence(db, mine, slot="THU_18_20", start=THURSDAY, reason="thu-active", motivated=True)
     _absence(db, second, status=STATUS_REVOKED, reason="ion-revoked")
 
     def page(qs):
@@ -144,6 +127,10 @@ def test_filters(as_assistant, db, assistant, mine):
     assert "thu-active" in html and "tue-active" not in html
     html = page("q=ionescu")
     assert "ion-revoked" in html and "thu-active" not in html
+    html = page("motivated=yes")
+    assert "thu-active" in html and "tue-active" not in html
+    html = page("motivated=no")
+    assert "tue-active" in html and "thu-active" not in html
     assert "No absences match" in page("q=zzz")
 
 
@@ -176,66 +163,17 @@ def test_search_json_escapes_user_content(as_assistant, db, mine):
     assert "&lt;script&gt;" in html
 
 
-def test_students_search_json_scoped(as_assistant, db, mine, theirs):
-    data = as_assistant.get("/students/search.json?q=student").get_json()
+def test_teams_search_json_scoped(as_assistant, db, mine, theirs):
+    data = as_assistant.get("/teams/search.json?q=student").get_json()
     assert data["count"] == 1
-    assert "MINE1" in data["html"] and "THEIRS1" not in data["html"]
+    assert "Mine Student" in data["html"] and "Their Student" not in data["html"]
 
 
 def test_pages_load_live_search_script(as_assistant):
-    for url in ("/absences/", "/students/"):
+    for url in ("/absences/", "/teams/"):
         html = as_assistant.get(url).get_data(as_text=True)
         assert "js/live-search.js" in html
         assert "data-live-search" in html
-
-
-# --- create -------------------------------------------------------------------------
-
-def test_create_absence(as_assistant, db, mine):
-    res = as_assistant.post("/absences/new", data=_new(mine, sessions_count=2))
-    assert res.status_code == 302
-    assert res.headers["Location"].endswith(f"/students/{mine.id}")
-    a = db.session.execute(db.select(Absence)).scalar_one()
-    assert (a.slot, a.start_date, a.sessions_count) == ("TUE_18_20", TUESDAY, 2)
-    assert a.source == SOURCE_ASSISTANT and a.status == STATUS_ACTIVE
-
-
-def test_create_preselects_student(as_assistant, db, assistant, mine):
-    second = _student(db, assistant, "S2")
-    html = as_assistant.get(f"/absences/new?student_id={second.id}").get_data(as_text=True)
-    assert f'<option selected value="{second.id}">' in html
-
-
-def test_create_without_students_redirects(as_assistant):
-    assert as_assistant.get("/absences/new").headers["Location"].endswith("/students/new")
-
-
-@pytest.mark.parametrize(
-    ("slot", "day"),
-    [("TUE_18_20", date(2026, 10, 26)), ("TUE_18_20", THURSDAY), ("THU_18_20", TUESDAY)],
-)
-def test_create_slot_date_mismatch_is_form_error(as_assistant, db, mine, slot, day):
-    res = as_assistant.post("/absences/new", data=_new(mine, slot=slot, start_date=day.isoformat()))
-    assert res.status_code == 200
-    html = res.get_data(as_text=True)
-    assert "is not a" in html and "is-invalid" in html
-    assert db.session.execute(db.select(Absence)).first() is None
-
-
-@pytest.mark.parametrize(
-    "override",
-    [{"sessions_count": 0}, {"sessions_count": MAX_SESSIONS + 1}, {"reason": ""},
-     {"start_date": "not-a-date"}, {"slot": "FRI_18_20"}],
-)
-def test_create_validation(as_assistant, db, mine, override):
-    res = as_assistant.post("/absences/new", data=_new(mine, **override))
-    assert res.status_code == 200
-    assert "is-invalid" in res.get_data(as_text=True)
-    assert db.session.execute(db.select(Absence)).first() is None
-
-
-def test_admin_creates_for_any_student(as_admin, db, theirs):
-    assert as_admin.post("/absences/new", data=_new(theirs)).status_code == 302
 
 
 # --- revoke -------------------------------------------------------------------------
@@ -260,7 +198,7 @@ def test_revoke_json_returns_updated_row(as_assistant, db, mine):
     assert f'id="absence-{a.id}"' in data["html"]
     assert 'data-status="revoked"' in data["html"]
     assert "Revoke</button>" not in data["html"]
-    assert mine.full_name in data["html"]  # student column kept for the list page
+    assert mine.name in data["html"]  # student column kept for the list page
     assert "revoked" in data["message"]
 
 
@@ -269,7 +207,7 @@ def test_revoke_json_without_student_column(as_assistant, db, mine):
     data = as_assistant.post(
         f"/absences/{a.id}/revoke", data={"show_student": "0"}, headers=JSON
     ).get_json()
-    assert "MINE1" not in data["html"]
+    assert "Mine Student" not in data["html"]
 
 
 def test_revoke_twice_conflicts(as_assistant, db, mine):
@@ -334,12 +272,58 @@ def test_extend_capped_at_max(as_assistant, db, mine):
     assert _reload(db, a.id).sessions_count == MAX_SESSIONS
 
 
+# --- motivated ----------------------------------------------------------------------
+
+def test_mark_motivated_json(as_assistant, db, mine):
+    a = _absence(db, mine)
+    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["absence"]["motivated"] is True
+    assert 'data-motivated="yes"' in data["html"]
+    assert 'aria-pressed="true"' in data["html"]
+    assert 'name="motivated" value="0"' in data["html"]  # next click unticks it
+    assert "marked motivated" in data["message"]
+    assert _reload(db, a.id).motivated
+
+
+def test_untick_motivated(as_assistant, db, mine):
+    a = _absence(db, mine, motivated=True)
+    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "0"}, headers=JSON)
+    assert res.get_json()["absence"]["motivated"] is False
+    assert not _reload(db, a.id).motivated
+
+
+def test_motivated_without_js(as_assistant, db, mine):
+    a = _absence(db, mine)
+    res = as_assistant.post(
+        f"/absences/{a.id}/motivated", data={"motivated": "1", "next": f"/students/{mine.id}"}
+    )
+    assert res.headers["Location"].endswith(f"/students/{mine.id}")
+    assert _reload(db, a.id).motivated
+
+
+def test_revoked_cannot_be_motivated(as_assistant, db, mine):
+    a = _absence(db, mine, status=STATUS_REVOKED)
+    res = as_assistant.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
+    assert res.status_code == 409
+    assert not _reload(db, a.id).motivated
+
+
+def test_admin_marks_any_absence_motivated(as_admin, db, theirs):
+    a = _absence(db, theirs)
+    res = as_admin.post(f"/absences/{a.id}/motivated", data={"motivated": "1"}, headers=JSON)
+    assert res.status_code == 200
+    assert _reload(db, a.id).motivated
+
+
 # --- profile ------------------------------------------------------------------------
 
-def test_profile_has_add_button_and_actions(as_assistant, db, mine):
+def test_profile_has_actions(as_assistant, db, mine):
     _absence(db, mine)
     html = as_assistant.get(f"/students/{mine.id}").get_data(as_text=True)
-    assert f"/absences/new?student_id={mine.id}" in html
+    assert "/absences/new" not in html
+    assert f"/absences/{mine.absences[0].id}/motivated" in html
     assert "js/absence-actions.js" in html
     assert "js-absence-action" in html
     assert f'name="next" value="/students/{mine.id}"' in html
@@ -362,7 +346,8 @@ def csrf_app():
         _db.create_all()
         assistant = User(email="a@example.com", name="A", role=ROLE_ASSISTANT)
         assistant.set_password("pw")
-        student = Student(assistant=assistant, student_number="S1", first_name="A", last_name="B")
+        student = Student(name="A B")
+        _db.session.add(Team(assistant=assistant, slot="TUE_18_20", members=[student]))
         _db.session.add(_absence_obj := Absence(
             student=student, slot="TUE_18_20", start_date=TUESDAY, reason="x"
         ))

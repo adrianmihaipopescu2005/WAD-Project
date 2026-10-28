@@ -53,7 +53,7 @@
           {% if current_user.is_authenticated %}
             {{ nav_link(url_for('dashboard.index'), "Dashboard", "grid-1x2",
                         request.endpoint == 'dashboard.index') }}
-            {{ nav_link(url_for('students.index'), "Students", "people", request.blueprint == 'students') }}
+            {{ nav_link(url_for('teams.index'), "Teams", "people", request.blueprint == 'teams') }}
             {{ nav_link(url_for('absences.index'), "Absences", "calendar-x", request.blueprint == 'absences') }}
             {{ nav_link(url_for('auth.api_key'), "API key", "key",
                         request.endpoint in ('auth.api_key', 'auth.generate_api_key')) }}

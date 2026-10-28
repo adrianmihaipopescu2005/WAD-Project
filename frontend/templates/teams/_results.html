@@ -1,0 +1,37 @@
+{#- Teams table or empty state. Rendered by the page and by the live-search JSON endpoint.
+    Needs: teams (rows of (Team, active_count)), filtered. -#}
+{% if not teams %}
+  <div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><p>{% if filtered %}No teams match this filter.{% else %}No teams yet.{% endif %}</p></div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Slot</th>
+          <th scope="col">Students</th>
+          {% if current_user.is_admin %}<th scope="col">Lab assistant</th>{% endif %}
+          <th scope="col" class="text-end">Active absences</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for team, active_count in teams %}
+          <tr>
+            <td class="text-nowrap">{{ team.slot_label }}</td>
+            <td>
+              {% for m in team.members %}
+                <a href="{{ url_for('teams.profile', student_id=m.id) }}">{{ m.name }}</a>{% if not loop.last %}<span class="text-body-secondary"> &amp; </span>{% endif %}
+              {% endfor %}
+            </td>
+            {% if current_user.is_admin %}<td>{{ team.assistant.name }}</td>{% endif %}
+            <td class="text-end" data-active="{{ team.id }}">{{ active_count }}</td>
+            <td class="text-end">
+              <a class="btn btn-outline-primary btn-sm" href="{{ url_for('teams.edit', team_id=team.id) }}">
+                <i class="bi bi-pencil" aria-hidden="true"></i> Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

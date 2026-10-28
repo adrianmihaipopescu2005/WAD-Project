@@ -6,7 +6,7 @@ from flask import Flask, render_template, request
 
 from .config import Config
 from .extensions import csrf, db, login_manager
-from .models import MAX_SESSIONS, ROLE_ADMIN, User
+from .models import MAX_SESSIONS, ROLE_ADMIN, ROLE_ASSISTANT, User
 from .services.absences import date_window
 from .services.auth import normalize_email
 from .utils import wants_json
@@ -43,13 +43,13 @@ def create_app(config_class=Config):
     from .blueprints.dashboard.routes import bp as dashboard_bp
     from .blueprints.main.routes import bp as main_bp
     from .blueprints.public.routes import bp as public_bp
-    from .blueprints.students.routes import bp as students_bp
+    from .blueprints.teams.routes import bp as teams_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(students_bp)
+    app.register_blueprint(teams_bp)
     app.register_blueprint(absences_bp)
     app.register_blueprint(public_bp)
     app.register_blueprint(api_bp)
@@ -127,11 +127,11 @@ def _register_cli(app):
     @app.cli.command("seed-demo")
     @click.option("--reset", is_flag=True, help="Delete ALL existing data first.")
     def seed_demo_command(reset):
-        """Fill an empty database with demo users, students and absences."""
+        """Fill an empty database with demo users, teams and absences."""
         from .seed import ADMIN, ASSISTANTS, seed_demo
 
         if reset:
-            click.confirm("This deletes ALL users, students and absences. Continue?", abort=True)
+            click.confirm("This deletes ALL users, teams and absences. Continue?", abort=True)
             db.drop_all()
         db.create_all()
         if db.session.execute(db.select(User.id).limit(1)).first() is not None:
@@ -143,4 +143,33 @@ def _register_cli(app):
         click.echo(f"  admin:     {ADMIN[0]} / {ADMIN[2]}")
         for email, _name, password in ASSISTANTS:
             click.echo(f"  assistant: {email} / {password}")
-        click.echo("Students for the public form: LM1001 … LM1004, LM2001 … LM2003")
+        click.echo("Demo teams are ready on the public form (/report/).")
+
+    @app.cli.command("import-teams")
+    @click.argument("path", type=click.Path(exists=True, dir_okay=False))
+    @click.option("--assistant", "assistant_email",
+                  help="Email of the lab assistant who gets the teams. "
+                       "Optional when there is exactly one assistant.")
+    def import_teams_command(path, assistant_email):
+        """Create teams from a text file: a 'Tuesday:'/'Thursday:' line, then one team per line
+        with the two names separated by '|', a tab or two spaces. Safe to run twice."""
+        from .services.teams import TeamError, import_teams
+
+        db.create_all()
+        stmt = db.select(User).where(User.role == ROLE_ASSISTANT)
+        if assistant_email:
+            stmt = stmt.where(User.email == normalize_email(assistant_email))
+        assistants = db.session.execute(stmt).scalars().all()
+        if len(assistants) != 1:
+            raise click.ClickException(
+                "No lab assistant with that email." if assistant_email else
+                "Pass --assistant EMAIL (there isn't exactly one lab assistant)."
+            )
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        try:
+            created, skipped = import_teams(assistants[0], text)
+        except TeamError as e:
+            raise click.ClickException(f"{e} Nothing was imported.") from None
+        click.echo(f"Imported {created} team(s) for {assistants[0].name}; "
+                   f"skipped {skipped} already there.")

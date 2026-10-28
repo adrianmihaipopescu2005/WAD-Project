@@ -11,7 +11,7 @@
       {% if current_user.is_admin %}
         As the admin, your key can check any student.
       {% else %}
-        Your key can only check your own students.
+        Your key can only check your own teams' students.
       {% endif %}
     </p>
 
@@ -63,11 +63,15 @@
 
     <h2 class="h5">How to call it</h2>
     <pre class="bg-body-tertiary border rounded p-3 small"><code>curl -H "X-API-Key: {{ new_key or 'lam_…' }}" \
-  "{{ url_for('api.validate', _external=True) }}?student_number=LM1234&amp;date=2026-10-27"</code></pre>
+  "{{ url_for('api.validate', _external=True) }}?student_id=12&amp;date=2026-10-27"</code></pre>
     <p class="small mb-1">Answer (200):</p>
-    <pre class="bg-body-tertiary border rounded p-3 small"><code>{"excused": true, "student_number": "LM1234", "date": "2026-10-27",
- "lab_day": true, "slot": "TUE_18_20", "slot_label": "Tuesday 18–20",
- "absence_id": 5, "until": "2026-11-10"}</code></pre>
+    <pre class="bg-body-tertiary border rounded p-3 small"><code>{"excused": true, "student_id": 12, "student_name": "Ana Popescu",
+ "date": "2026-10-27", "lab_day": true, "slot": "TUE_18_20", "slot_label": "Tuesday 18–20",
+ "reported": true, "motivated": true, "absence_id": 5, "until": "2026-10-27"}</code></pre>
+    <p class="small text-body-secondary">
+      <code>excused</code> is true only for an active absence marked motivated. The student ids are
+      in the URL of each student's page (<code>/students/&lt;id&gt;</code>).
+    </p>
     <p class="small text-body-secondary">
       Errors: <code>400</code> bad or missing parameters, <code>401</code> missing or invalid key,
       <code>404</code> unknown student (or not yours). The body is <code>{"error": "…"}</code>.

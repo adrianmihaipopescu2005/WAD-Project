@@ -9,12 +9,17 @@
     </div>
   {% elif check.excused %}
     <div class="alert alert-success mb-0" data-result="excused">
-      <strong>✓ Excused.</strong> {{ check.student_number }} on {{ check.date }} ({{ check.slot_label }}),
-      covered by absence #{{ check.absence_id }} until {{ check.until }}.
+      <strong>✓ Excused.</strong> {{ check.student_name }} on {{ check.date }} ({{ check.slot_label }}),
+      motivated absence #{{ check.absence_id }}, until {{ check.until }}.
+    </div>
+  {% elif check.reported %}
+    <div class="alert alert-warning mb-0" data-result="not-motivated">
+      <strong>✗ Not excused yet.</strong> {{ check.student_name }} reported absence #{{ check.absence_id }}
+      for {{ check.date }} ({{ check.slot_label }}), but it isn't marked motivated.
     </div>
   {% else %}
     <div class="alert alert-warning mb-0" data-result="not-excused">
-      <strong>✗ Not excused.</strong> {{ check.student_number }} on {{ check.date }} ({{ check.slot_label }}).
+      <strong>✗ Not excused.</strong> {{ check.student_name }} on {{ check.date }} ({{ check.slot_label }}).
     </div>
   {% endif %}
 {% endif %}

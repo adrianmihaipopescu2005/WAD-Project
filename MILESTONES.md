@@ -16,10 +16,24 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
   - Dynamic: **excused-check widget** calling the API.
 - [x] **M8: Polish + submission.** Tests for all invariants, demo seed data, README with run instructions and screenshots.
 
+- [x] **M9: Teams, deadline and "motivated" (2026-10-28).** Students pick their team and name instead of a student number, report by the day before, and staff tick "motivated".
+
 ## Open questions
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M9: Teams, reporting deadline, "motivated" (2026-10-28)
+- User decisions: one lab assistant (Darian), who doesn't have the students' codes. Students are in **teams of two** with a fixed slot (team list supplied by the user, 38 teams). Students pick their team, then which of the two they are. Report by **23:59 the day before** (Monday for Tuesday, Wednesday for Thursday). Admin and assistant tick **"Motivated"**. Staff don't enter absences.
+- Model: new `teams` table (slot CHECK, FK to the assistant `ON DELETE RESTRICT`). `students` now has `team_id` (FK `ON DELETE CASCADE`) and `name`; `student_number`, `first_name`/`last_name`, `email`, `study_group` and `assistant_id` were removed. `absences` got `motivated` (default false) and lost `source`. Scoping goes through `Team.assistant_id`.
+- `app/clock.py`: "today" is in Europe/Bucharest, so the deadline holds whatever the server's time zone is. `DAYS_BACK` removed; the window is tomorrow to 183 days ahead.
+- Public form: one select grouped by team (works without JS); `smart-form.js` turns it into a team picker plus "which one are you?" radios, checks the team's weekday and the deadline, and offers "Use the next session". One report = one session. Lookup endpoint removed.
+- Teams page (`/teams/`) replaces the students pages: list with live search and slot filter, add/edit (rename in place keeps absences; clearing a name deletes that student) and delete (cascades). Student profile at `/students/<id>`.
+- Absences: "Motivated" toggle in each row (fetch, in place), "motivated" filter, no staff create page. Dashboard: teams/students, active and "not motivated yet" counts, a "Review N absence(s)" button, excused check by student (select).
+- Validation API: `student_id` instead of `student_number`; `excused` needs a motivated absence; new `reported`/`motivated`/`student_name` fields.
+- `flask import-teams FILE [--assistant EMAIL]`: parses the pasted format (`|`, tab or 2+ spaces), skips teams that already exist, all-or-nothing on conflicts. The real list is in `backend/instance/teams.txt` (git-ignored); duplicates in the pasted list (4 teams listed twice) were merged and a few names capitalized.
+- `seed-demo`: admin + Darian (`darian@lab.local`), 5 made-up teams, 6 absences.
+- Tests rewritten for the new model (`test_teams.py` replaces `test_students.py`). **243 passed**, ruff clean. JS syntax checked with JavaScriptCore; **not yet tried in a real browser** (the Chrome extension wasn't connected).
+
 ### Restyle: "modern clean" theme + dark mode (2026-10-26)
 - User choice: the "modern clean" direction, plus a dark mode toggle, icons, a new home page and subtle animations. See `adr/frontend/frontend-theme.md`.
 - `static/css/app.css` rewritten around `--lam-*` color tokens on top of Bootstrap's CSS variables (light and dark):

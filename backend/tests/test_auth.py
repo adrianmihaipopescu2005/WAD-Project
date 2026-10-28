@@ -1,11 +1,10 @@
 import pytest
-from conftest import login
+from conftest import add_team, login
 
 from app import create_app
 from app.config import TestingConfig
 from app.decorators import admin_required
 from app.extensions import db as _db
-from app.models import Student
 from app.services.auth import safe_next_url
 
 
@@ -120,22 +119,19 @@ def test_404_page_rendered(client):
 
 def test_dashboard_stats_scoped_per_assistant(client, db, admin, assistant, make_user):
     other = make_user("other@example.com", "assistant")
-    db.session.add_all([
-        Student(assistant=assistant, student_number="S1", first_name="A", last_name="A"),
-        Student(assistant=other, student_number="S2", first_name="B", last_name="B"),
-        Student(assistant=other, student_number="S3", first_name="C", last_name="C"),
-    ])
-    db.session.commit()
+    add_team(assistant, "A A")
+    add_team(other, "B B", "C C")
+    add_team(other, "D D")
 
     login(client, assistant.email)
     html = client.get("/dashboard/").get_data(as_text=True)
-    assert 'data-stat="students">1<' in html
+    assert 'data-stat="teams">1<' in html and "1 students" in html
     assert 'data-stat="assistants"' not in html
     client.post("/logout")
 
     login(client, admin.email)
     html = client.get("/dashboard/").get_data(as_text=True)
-    assert 'data-stat="students">3<' in html
+    assert 'data-stat="teams">3<' in html and "4 students" in html
     assert 'data-stat="assistants">2<' in html
 
 

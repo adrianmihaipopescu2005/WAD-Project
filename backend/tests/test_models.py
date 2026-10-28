@@ -1,21 +1,13 @@
 from datetime import date
 
 import pytest
+from conftest import THURSDAY, TUESDAY, add_student, add_team
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from app.models import STATUS_REVOKED, Absence, Student, User
+from app.models import STATUS_REVOKED, Absence, Student, Team, User
 
-TUESDAY = date(2026, 10, 27)
-THURSDAY = date(2026, 10, 29)
 MONDAY = date(2026, 10, 26)
-
-
-def _student(db, assistant, number="S001"):
-    s = Student(assistant=assistant, student_number=number, first_name="Ana", last_name="Pop")
-    db.session.add(s)
-    db.session.commit()
-    return s
 
 
 def _add_and_expect_integrity_error(db, obj):
@@ -41,35 +33,43 @@ def test_invalid_role_rejected(db):
     )
 
 
-def test_student_number_unique(db, assistant):
-    _student(db, assistant, "S001")
-    _add_and_expect_integrity_error(
-        db, Student(assistant=assistant, student_number="S001", first_name="B", last_name="C")
-    )
+def test_team_requires_existing_assistant(db):
+    _add_and_expect_integrity_error(db, Team(assistant_id=999, slot="TUE_18_20"))
 
 
-def test_student_requires_existing_assistant(db):
-    _add_and_expect_integrity_error(
-        db, Student(assistant_id=999, student_number="S9", first_name="B", last_name="C")
-    )
+def test_team_slot_checked(db, assistant):
+    _add_and_expect_integrity_error(db, Team(assistant=assistant, slot="FRI_18_20"))
 
 
-def test_cannot_delete_assistant_with_students(db, assistant):
-    _student(db, assistant)
+def test_student_requires_existing_team(db):
+    _add_and_expect_integrity_error(db, Student(team_id=999, name="Ghost"))
+
+
+def test_cannot_delete_assistant_with_teams(db, assistant):
+    add_team(assistant)
     # RESTRICT fails on the DELETE statement itself, not on commit.
     with pytest.raises(IntegrityError):
         db.session.execute(text("DELETE FROM users WHERE id = :id"), {"id": assistant.id})
     db.session.rollback()
 
 
+def test_team_label_and_teammates(assistant):
+    team = add_team(assistant, "Ana Pop", "Ion Ionescu")
+    assert team.label == "Ana Pop & Ion Ionescu"
+    ana, ion = team.members
+    assert ana.teammates == [ion] and ion.teammates == [ana]
+    assert ana.initials == "AP"
+
+
 def test_valid_absences_accepted(db, assistant):
-    s = _student(db, assistant)
+    s = add_student(assistant)
     db.session.add_all([
         Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="Doctor"),
         Absence(student=s, slot="THU_18_20", start_date=THURSDAY, reason="Exam", sessions_count=2),
     ])
     db.session.commit()
     assert len(s.absences) == 2
+    assert not s.absences[0].motivated  # staff tick it later
 
 
 @pytest.mark.parametrize(
@@ -77,30 +77,32 @@ def test_valid_absences_accepted(db, assistant):
     [("TUE_18_20", MONDAY), ("TUE_18_20", THURSDAY), ("THU_18_20", TUESDAY), ("FRI_18_20", MONDAY)],
 )
 def test_slot_weekday_mismatch_rejected(db, assistant, slot, day):
-    s = _student(db, assistant)
+    s = add_student(assistant)
     _add_and_expect_integrity_error(db, Absence(student=s, slot=slot, start_date=day, reason="x"))
 
 
 def test_sessions_count_must_be_positive(db, assistant):
-    s = _student(db, assistant)
+    s = add_student(assistant)
     _add_and_expect_integrity_error(
         db, Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", sessions_count=0)
     )
 
 
 def test_invalid_status_rejected(db, assistant):
-    s = _student(db, assistant)
+    s = add_student(assistant)
     _add_and_expect_integrity_error(
         db, Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x", status="pending")
     )
 
 
-def test_deleting_student_deletes_absences(db, assistant):
-    s = _student(db, assistant)
+def test_deleting_team_deletes_students_and_absences(db, assistant):
+    s = add_student(assistant)
     db.session.add(Absence(student=s, slot="TUE_18_20", start_date=TUESDAY, reason="x"))
     db.session.commit()
-    db.session.delete(s)
+    # Through the DB's ON DELETE CASCADE, not only the ORM.
+    db.session.execute(text("DELETE FROM teams"))
     db.session.commit()
+    assert db.session.execute(db.select(Student)).first() is None
     assert db.session.execute(db.select(Absence)).first() is None
 
 
@@ -113,3 +115,11 @@ def test_covers():
     assert not a.covers(THURSDAY)  # other weekday
     a.status = STATUS_REVOKED
     assert not a.covers(TUESDAY)
+
+
+def test_excuses_needs_motivated():
+    a = Absence(slot="TUE_18_20", start_date=TUESDAY, sessions_count=1, status="active",
+                motivated=False)
+    assert a.covers(TUESDAY) and not a.excuses(TUESDAY)
+    a.motivated = True
+    assert a.excuses(TUESDAY)
