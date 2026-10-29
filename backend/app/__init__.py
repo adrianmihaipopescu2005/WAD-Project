@@ -43,6 +43,7 @@ def create_app(config_class=Config):
     from .blueprints.dashboard.routes import bp as dashboard_bp
     from .blueprints.main.routes import bp as main_bp
     from .blueprints.public.routes import bp as public_bp
+    from .blueprints.student.routes import bp as student_bp
     from .blueprints.teams.routes import bp as teams_bp
 
     app.register_blueprint(main_bp)
@@ -52,6 +53,7 @@ def create_app(config_class=Config):
     app.register_blueprint(teams_bp)
     app.register_blueprint(absences_bp)
     app.register_blueprint(public_bp)
+    app.register_blueprint(student_bp)
     app.register_blueprint(api_bp)
 
     # logout_form: the navbar's logout button is a POST form on every page.
@@ -161,6 +163,20 @@ def _register_cli(app):
         Absence.__table__.drop(db.engine, checkfirst=True)
         Absence.__table__.create(db.engine)
         click.echo("The absences table was recreated (empty).")
+
+    @app.cli.command("upgrade-db")
+    def upgrade_db_command():
+        """Bring an existing database up to date without losing data (safe to run twice).
+
+        2026-10-29: student accounts, so users.role also allows 'student'.
+        """
+        from .upgrade import upgrade_users_role_check
+
+        db.create_all()
+        if upgrade_users_role_check():
+            click.echo("Upgraded the users table: student accounts are now allowed.")
+        else:
+            click.echo("The database is already up to date.")
 
     @app.cli.command("import-teams")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False))

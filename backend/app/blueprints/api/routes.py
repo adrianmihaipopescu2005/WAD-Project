@@ -22,6 +22,8 @@ def validate():
     user = _api_user()
     if user is None:
         return {"error": "Send a valid X-API-Key header, or log in."}, 401
+    if not user.is_staff:
+        return {"error": "Only staff can use the validation API."}, 403
     try:
         student_id = service.parse_student_id(request.args.get("student_id"))
         day = service.parse_day(request.args.get("date"))

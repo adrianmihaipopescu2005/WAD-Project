@@ -61,7 +61,11 @@
       </div>
 
       {{ render_field(form.reason, rows=3, maxlength=500) }}
-      {{ render_field(form.email, autocomplete="email", placeholder="name@student.upt.ro") }}
+      <p class="form-text mb-3">
+        <i class="bi bi-envelope" aria-hidden="true"></i>
+        The decision is emailed to <strong>{{ current_user.email }}</strong>, and the absence appears on
+        <a href="{{ url_for('student.absences') }}">My absences</a>.
+      </p>
 
       {{ form.submit(class="btn btn-primary") }}
     </form>

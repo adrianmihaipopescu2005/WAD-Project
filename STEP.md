@@ -1,9 +1,9 @@
 # STEP: current progress
 
-Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.md`.
+Updated: 2026-10-29. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M10: Decision emails.** Committed and pushed, not deployed yet. M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
+**M11: Student accounts + login first.** Committed and pushed, not deployed yet (needs `flask --app app upgrade-db`). M10 is pushed but not deployed; M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -59,9 +59,15 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
   - `flask reset-absences` to update the deployed DB without losing users/teams.
   - 261 tests pass. Real email sending not tried yet (needs the Gmail app password).
 
+- **M11:**
+  - Student sign-up / password reset by emailed set-password link; `/my/absences` shows the status of every absence reported with the account email.
+  - Students blocked from staff pages and the API (403). `flask upgrade-db` for the deployed DB.
+  - Login first: `/report/` needs a student login, the email field is gone (the account email is used). Home page: "Log in to report" / "Create a student account".
+  - 288 tests pass. Not tried in a browser; needs the Gmail app password to send links.
+
 ## Next
-- Try the new public form and the Motivated toggle in a browser.
-- On PythonAnywhere: pull, `flask --app app reset-absences`, add `MAIL_USERNAME`/`MAIL_PASSWORD` to the WSGI file, reload.
+- Try the report form, sign-up and the Motivated toggle in a real browser (M11 checked over HTTP only).
+- On PythonAnywhere: pull, `flask --app app reset-absences` (M10), `flask --app app upgrade-db` (M11), add `MAIL_USERNAME`/`MAIL_PASSWORD` to the WSGI file, reload.
 - Pick the sending Gmail account and create an app password.
 - Optional: screenshots in the README.
 - Anything the course or the lab assistant asks for after a demo.
@@ -71,7 +77,7 @@ Updated: 2026-10-28. The full plan and the per-milestone log are in `MILESTONES.
 
 ## Decisions so far
 - The absence app is mapped onto the WAD spec: admin = professor, seller = lab assistant, customer = student, license = absence.
-- Students use a public form with no login. Revoke = reject/cancel. Extend = covers more weekly sessions.
+- Students log in first (since 2026-10-29): sign up by emailed link, then report on `/report/` and follow the status on "My absences" (matched by the account email). Revoke = reject/cancel. Extend = covers more weekly sessions.
 - The API checks whether a student is excused on a given date.
 - Stack: Flask + Bootstrap 5 + SQLite. Milestones are tracked in `MILESTONES.md` + git, and the current state here in `STEP.md`.
 - Dynamic features, a course requirement (decided 2026-10-23): revoke/extend in place, live search, smart absence form, excused-check widget. Vanilla JS `fetch` + JSON, progressive enhancement. See `adr/shared/shared-dynamic-features.md`.

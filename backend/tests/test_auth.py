@@ -86,7 +86,7 @@ def test_anonymous_redirected_to_login_with_next(client):
 
 def test_navbar_for_anonymous(client):
     html = client.get("/").get_data(as_text=True)
-    assert "Staff login" in html
+    assert "Log in" in html and "Sign up" in html
     assert "Log out" not in html
 
 

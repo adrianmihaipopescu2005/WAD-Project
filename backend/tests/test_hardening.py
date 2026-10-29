@@ -23,7 +23,7 @@ def student(db, assistant):
 def _report(student_id=1, **override):
     return {
         "student_id": student_id, "start_date": NEXT_TUESDAY.isoformat(), "reason": "x",
-        "email": "a@b.ro", **override,
+        **override,
     }
 
 
@@ -41,8 +41,8 @@ def _count(db, model):
      ("2027-05-04", False),   # Tuesday, 190 days ahead
      ("9999-12-28", False)],  # the overflow case from the review
 )
-def test_public_date_window(client, db, student, day, ok):
-    res = client.post("/report/", data=_report(student.id, start_date=day))
+def test_public_date_window(student_client, db, student, day, ok):
+    res = student_client.post("/report/", data=_report(student.id, start_date=day))
     assert (res.status_code == 302) is ok
     if not ok:
         assert _count(db, Absence) == 0
@@ -50,12 +50,12 @@ def test_public_date_window(client, db, student, day, ok):
 
 # --- generic duplicate message ----------------------------------------------------------
 
-def test_duplicate_message_is_generic(client, db, student):
+def test_duplicate_message_is_generic(student_client, db, student):
     db.session.add(Absence(
         email="s@example.com",
         student=student, slot="TUE_18_20", start_date=NEXT_TUESDAY, reason="x"))
     db.session.commit()
-    res = client.post("/report/", data=_report(student.id))
+    res = student_client.post("/report/", data=_report(student.id))
     assert res.status_code == 200
     html = res.get_data(as_text=True)
     assert "couldn" in html and "absent" not in html.lower().split("<main")[1].split("</main>")[0]
@@ -86,7 +86,7 @@ def test_report_posts_rate_limited_but_page_still_loads(limited_client):
     res = limited_client.post("/report/", data=_report())
     assert res.status_code == 429
     assert "Too many requests" in res.get_data(as_text=True)  # HTML error page
-    assert limited_client.get("/report/").status_code == 200  # GETs aren't counted
+    assert limited_client.get("/report/").status_code != 429  # GETs aren't counted
 
 
 def test_rate_limit_json_for_fetch(limited_client):

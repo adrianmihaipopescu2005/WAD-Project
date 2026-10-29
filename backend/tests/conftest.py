@@ -5,7 +5,7 @@ import pytest
 from app import clock, create_app
 from app.config import TestingConfig
 from app.extensions import db as _db
-from app.models import ROLE_ADMIN, ROLE_ASSISTANT, Student, Team, User
+from app.models import ROLE_ADMIN, ROLE_ASSISTANT, ROLE_STUDENT, Student, Team, User
 
 TODAY = date(2026, 10, 26)  # a Monday; the tests' fixed dates are relative to it
 TUESDAY = date(2026, 10, 27)  # tomorrow: the earliest session a student may still report
@@ -59,6 +59,19 @@ def admin(app):
 @pytest.fixture
 def assistant(app):
     return _make_user("assistant@example.com", ROLE_ASSISTANT)
+
+
+@pytest.fixture
+def student_account(app):
+    """A student account; the absences it reports get this email."""
+    return _make_user("ana.popescu@student.upt.ro", ROLE_STUDENT)
+
+
+@pytest.fixture
+def student_client(client, student_account):
+    """A client logged in as `student_account` (reporting needs a student login)."""
+    login(client, student_account.email)
+    return client
 
 
 def login(client, email, password="secret123", **query):

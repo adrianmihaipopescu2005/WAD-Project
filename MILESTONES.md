@@ -18,11 +18,23 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 
 - [x] **M9: Teams, deadline and "motivated" (2026-10-28).** Students pick their team and name instead of a student number, report by the day before, and staff tick "motivated".
 - [x] **M10: Decision emails (2026-10-28).** Required student email; pending / motivated / not motivated; each decision emails the student.
+- [x] **M11: Student accounts (2026-10-29).** Students sign up by emailed link and see the status of their own absences.
 
 ## Open questions
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M11: Student accounts (2026-10-29)
+- User decisions: students can make an account and see the status of all their absences (pending / motivated / not motivated); the decision emails stay. This replaces "two logged-in roles only". Admin is an auxiliary role (WAD roles: assistant = seller, student = customer).
+- Defaults chosen (not asked): the account sees the absences reported **with its email**, only its own, read-only.
+- `users.role` CHECK allows `student`; `User.is_staff` / `is_student`; `student_required`.
+- `services/student_accounts.py`: `/signup` (name + email) emails a set-password link (`itsdangerous`, 24 h, single use via a password-hash fingerprint). The account is created only on that link's page, so nobody can pre-register a classmate's email; the same flow resets a forgotten password. Same answer whether or not the email exists; staff emails get no link. Rate limit 5 POSTs/min per IP. In debug, an unsent link is logged.
+- `/my/absences`: table with decision + status badges, filter pills with counts, "Report an absence" button. The public form prefills the account email.
+- Login is now "Log in" for everyone and redirects students to `/my/absences`. Navbar per role, "Sign up" for visitors. Students get 403 on every staff page and on `/api/v1/validate`.
+- `flask upgrade-db`: rebuilds `users` in one transaction (foreign keys off, `PRAGMA foreign_key_check`), safe to run twice.
+- **Login first** (user decision, same day): every user logs in before doing anything. `/report/` (and its thanks page) needs a student login; anonymous visitors go to the login page and come back to the form, staff get 403. The email field is gone: the absence gets the account's email (a posted `email` is ignored). Home page: "Log in to report" and "Create a student account", new "How it works" steps.
+- Tests: `test_student_accounts.py` (28) plus the public-form tests now run as a logged-in student (`student_client` fixture). **288 passed**, ruff clean. Walked through over HTTP on a running dev server (sign-up link, My absences, report, decision, 403s, link reuse); not tried in a real browser (Chrome extension not connected). Real email sending still needs the Gmail app password.
+
 ### M10: Decision emails (2026-10-28)
 - User decisions: the student's email is **required** on the public form; staff choose **Motivated** or **Not motivated** (a third state, **Pending**, replaces the unticked checkbox) and the student gets an email either way.
 - `absences`: `motivated` replaced by `decision` (CHECK `pending`/`motivated`/`not_motivated`), plus `email` (NOT NULL), `decided_at`, `notified_at`. `Absence.motivated` is now a property.

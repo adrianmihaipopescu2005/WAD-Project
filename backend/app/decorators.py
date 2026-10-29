@@ -4,7 +4,7 @@ from flask import abort
 from flask_login import current_user
 
 from .extensions import login_manager
-from .models import ROLE_ADMIN, ROLE_ASSISTANT
+from .models import ROLE_ADMIN, ROLE_ASSISTANT, ROLE_STUDENT
 from .utils import wants_json
 
 
@@ -29,3 +29,4 @@ def role_required(*roles):
 
 admin_required = role_required(ROLE_ADMIN)
 staff_required = role_required(ROLE_ADMIN, ROLE_ASSISTANT)
+student_required = role_required(ROLE_STUDENT)

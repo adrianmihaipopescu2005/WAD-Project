@@ -11,10 +11,20 @@
         Mobile Systems and Applications lab session, and why. It takes less than a minute.
       </p>
       <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-primary btn-lg px-4" href="{{ url_for('public.report') }}">
-          <i class="bi bi-send" aria-hidden="true"></i> Report an absence</a>
-        <a class="btn btn-outline-secondary btn-lg px-4" href="{{ url_for('auth.login') }}">
-          <i class="bi bi-person-lock" aria-hidden="true"></i> Staff login</a>
+        {% if current_user.is_authenticated and current_user.is_student %}
+          <a class="btn btn-primary btn-lg px-4" href="{{ url_for('public.report') }}">
+            <i class="bi bi-send" aria-hidden="true"></i> Report an absence</a>
+          <a class="btn btn-outline-secondary btn-lg px-4" href="{{ url_for('student.absences') }}">
+            <i class="bi bi-calendar-check" aria-hidden="true"></i> My absences</a>
+        {% elif current_user.is_authenticated %}
+          <a class="btn btn-primary btn-lg px-4" href="{{ url_for('dashboard.index') }}">
+            <i class="bi bi-grid-1x2" aria-hidden="true"></i> Dashboard</a>
+        {% else %}
+          <a class="btn btn-primary btn-lg px-4" href="{{ url_for('auth.login', next=url_for('public.report')) }}">
+            <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Log in to report</a>
+          <a class="btn btn-outline-secondary btn-lg px-4" href="{{ url_for('student.signup') }}">
+            <i class="bi bi-person-plus" aria-hidden="true"></i> Create a student account</a>
+        {% endif %}
       </div>
     </div>
     <div class="col-lg-5">
@@ -36,9 +46,9 @@
   <h2 id="how-title" class="h4 mb-4 text-center">How it works</h2>
   <div class="row g-3">
     {% set steps = [
-      ("Pick your team and name", "Find your team in the list, then choose which of the two students you are."),
-      ("Pick the session and reason", "Choose the session you'll miss (by 23:59 the day before at the latest) and give your email."),
-      ("You get an email", "Your lab assistant checks the reason, and you're emailed whether the absence was motivated or not."),
+      ("Log in", "Create your student account once with your email, then log in."),
+      ("Report the absence", "Pick your team and name, the session you'll miss (by 23:59 the day before at the latest) and the reason."),
+      ("Follow the decision", "Your lab assistant checks the reason. You're emailed the decision and can see it on My absences."),
     ] %}
     {% for title, text in steps %}
       <div class="col-md-4">

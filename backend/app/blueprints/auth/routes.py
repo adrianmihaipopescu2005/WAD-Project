@@ -9,10 +9,15 @@ from .forms import LoginForm, LogoutForm
 bp = Blueprint("auth", __name__)
 
 
+def home_url(user):
+    """Where a logged-in user starts: students see their absences, staff the dashboard."""
+    return url_for("student.absences" if user.is_student else "dashboard.index")
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(home_url(current_user))
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -20,7 +25,7 @@ def login():
         if user is not None:
             login_user(user, remember=form.remember.data)
             flash(f"Welcome, {user.name}!", "success")
-            return redirect(safe_next_url(request.args.get("next")) or url_for("dashboard.index"))
+            return redirect(safe_next_url(request.args.get("next")) or home_url(user))
         flash("Invalid email or password.", "danger")
     return render_template("auth/login.html", form=form)
 

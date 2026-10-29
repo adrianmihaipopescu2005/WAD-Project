@@ -50,7 +50,12 @@
                 <i class="bi bi-{{ icon }}" aria-hidden="true"></i>{{ label }}</a>
             </li>
           {% endmacro %}
-          {% if current_user.is_authenticated %}
+          {% if current_user.is_authenticated and current_user.is_student %}
+            {{ nav_link(url_for('student.absences'), "My absences", "calendar-check",
+                        request.endpoint == 'student.absences') }}
+            {{ nav_link(url_for('public.report'), "Report an absence", "calendar-plus",
+                        request.blueprint == 'public') }}
+          {% elif current_user.is_authenticated %}
             {{ nav_link(url_for('dashboard.index'), "Dashboard", "grid-1x2",
                         request.endpoint == 'dashboard.index') }}
             {{ nav_link(url_for('teams.index'), "Teams", "people", request.blueprint == 'teams') }}
@@ -79,8 +84,10 @@
                 <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Log out</button>
             </form>
           {% else %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('student.signup') }}">
+              <i class="bi bi-person-plus" aria-hidden="true"></i> Sign up</a>
             <a class="btn btn-sm btn-primary" href="{{ url_for('auth.login') }}">
-              <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Staff login</a>
+              <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Log in</a>
           {% endif %}
         </div>
       </div>

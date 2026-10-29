@@ -2,10 +2,10 @@
 
 A web app where students tell their lab assistant that they can't attend a **Mobile Systems and
 Applications** lab session (**Tuesday 18–20** or **Thursday 18–20**), and why. Students work in
-teams of two with a fixed slot. A student picks their team and their name on a public form, by
-23:59 the day before the session, with their email. The lab assistant and the professor check each
+teams of two with a fixed slot. A student creates an account, logs in, then picks their team and
+their name on the report form, by 23:59 the day before the session. The lab assistant and the professor check each
 absence and mark it **Motivated** or **Not motivated**, and the student gets an email with the
-decision. Other programs can check through an API whether a student is excused.
+decision and sees it on **My absences**. Other programs can check through an API whether a student is excused.
 
 It's built for the **Web Application Design (WAD)** project. The WAD "software license dashboard"
 spec is mapped onto absences (see [the mapping](#how-the-wad-requirements-map-onto-this-app)).
@@ -42,7 +42,8 @@ Alternatively, run `.\.venv\Scripts\Activate.ps1` once per terminal, and plain `
 | Admin (professor) | `prof@demo.local` | `demo-admin-123` |
 | Lab assistant | `darian@lab.local` | `demo-pass-123` |
 
-The demo has 5 made-up teams, so the public form works right away. The demo absences are dated
+The demo has 5 made-up teams, so the report form works right away once a student signs up
+(without `MAIL_*` settings, `--debug` prints the sign-up link in the console). The demo absences are dated
 relative to the day you run the command.
 `seed-demo` only fills an empty database. `seed-demo --reset` deletes everything first, after asking.
 
@@ -63,7 +64,10 @@ The file has a `Tuesday:` or `Thursday:` line, then one team per line with the t
 by `|`, a tab or two spaces. Running it again skips the teams that already exist.
 
 `flask --app app reset-absences` empties and recreates only the absences table (users and teams
-stay). Use it after an update that changes the absences columns. Keep the file
+stay). Use it after an update that changes the absences columns.
+
+`flask --app app upgrade-db` updates an existing database in place without losing data (for
+example to allow student accounts, 2026-10-29). Running it twice is harmless. Keep the file
 in `backend/instance/`, which git ignores, so real names don't end up in the repository.
 
 ### Configuration (environment variables)
@@ -86,12 +90,12 @@ Without `MAIL_USERNAME`, decisions are still saved, but no email is sent and sta
 |----------|----------|
 | System admin | **Admin** = the professor. Adds and removes lab assistants, sees everything. |
 | Seller | **Lab assistant**. Sees and changes only their own teams, their students and those students' absences. |
-| Customer | **Student**. Belongs to a team (2 students, fixed slot) of one assistant. Has no login. |
+| Customer | **Student**. Belongs to a team (2 students, fixed slot) of one assistant. Can sign up (`/signup`) to see the status of their absences on `/my/absences`. |
 | License | **Absence**: student, slot, first missed date, number of weekly sessions, reason, the student's email, decision (pending / motivated / not motivated), status. |
 | Login page | `/login` |
 | Add / edit / delete customer, customer profile | Teams: `/teams/new`, `/teams/<id>/edit` (delete there too). Student profile: `/students/<id>` |
 | Customers page | `/teams/` (search by name, filter by slot, plus by assistant for the admin) |
-| Create license | The public form `/report/` (students only; staff don't enter absences) |
+| Create license | The report form `/report/` (logged-in students only; staff don't enter absences) |
 | Licenses page (filter by customer, revoke, extend) | `/absences/`: filters for student, status, decision, slot and search. Motivated / not motivated (emails the student), revoke and extend. |
 | Revoke license | Marks the absence *revoked*. It's kept, never deleted. |
 | Extend license | Adds weekly sessions (max 14, one semester). |
@@ -153,7 +157,7 @@ admin's key sees all students.
 - Assistants only ever see their own data. This is checked on the server, also for the JSON
   endpoints and the API.
 - CSRF protection on every form and every `fetch` POST. Passwords and API keys are stored hashed.
-- The public form is rate-limited per IP address (10 reports per minute, in memory).
+- The report form and sign-up are rate-limited per IP address (10 reports per minute, in memory).
 
 ## Tests
 
@@ -163,7 +167,7 @@ cd backend
 .\.venv\Scripts\python -m ruff check .
 ```
 
-There are 261 tests: models, auth, admin, teams (and the import), absences, the public form and
+There are 288 tests: models, auth, admin, teams (and the import), absences, the public form and
 its deadline, the API, the demo data and the hardening fixes.
 
 ## Project layout
@@ -183,5 +187,5 @@ MILESTONES.md         milestone plan and log, STEP.md: current status
   several server processes.
 - Behind a reverse proxy, the rate limiter sees the proxy's IP unless the app is configured for
   the proxy (`ProxyFix`).
-- The public form lists every student's name, so anyone with the link can see who is in which
+- The report form lists every student's name, so any logged-in student can see who is in which
   team. A student could also report an absence in a teammate's name.

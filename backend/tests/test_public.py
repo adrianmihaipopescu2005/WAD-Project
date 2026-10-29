@@ -6,7 +6,22 @@ from conftest import THURSDAY, TUESDAY, add_team, login
 from app import clock, create_app
 from app.config import TestingConfig
 from app.extensions import db as _db
-from app.models import ROLE_ASSISTANT, STATUS_ACTIVE, STATUS_REVOKED, Absence, Student, Team, User
+from app.models import (
+    ROLE_ASSISTANT,
+    ROLE_STUDENT,
+    STATUS_ACTIVE,
+    STATUS_REVOKED,
+    Absence,
+    Student,
+    Team,
+    User,
+)
+
+
+@pytest.fixture
+def client(student_client):
+    """Every test here reports as a logged-in student (decided 2026-10-29)."""
+    return student_client
 
 
 @pytest.fixture
@@ -27,7 +42,7 @@ def thu_student(assistant):
 def _report(student, **override):
     return {
         "student_id": student.id, "start_date": TUESDAY.isoformat(),
-        "reason": "Medical appointment", "email": "Ana.Popescu@student.upt.ro", **override,
+        "reason": "Medical appointment", **override,
     }
 
 
@@ -42,7 +57,7 @@ def _errors(res):
 
 # --- page ---------------------------------------------------------------------------
 
-def test_report_page_is_public_and_groups_names_by_team(client, team, thu_student):
+def test_report_page_groups_names_by_team(client, team, thu_student):
     res = client.get("/report/")
     assert res.status_code == 200
     html = res.get_data(as_text=True)
@@ -82,8 +97,9 @@ def test_submit_goes_to_the_teams_assistant(client, db, student, assistant):
     assert absence.status == STATUS_ACTIVE
     assert absence.sessions_count == 1
     assert absence.decision == "pending"  # staff decide after checking
-    assert absence.email == "ana.popescu@student.upt.ro"  # stored lower-case
+    assert absence.email == "ana.popescu@student.upt.ro"  # the account's email
 
+    client.post("/logout")
     login(client, assistant.email)
     assert "Medical appointment" in client.get("/absences/").get_data(as_text=True)
 
@@ -158,15 +174,39 @@ def test_clock_uses_romanian_time():
     assert str(clock.TIMEZONE) == "Europe/Bucharest"
 
 
-def test_email_field_is_required(client, team):
+def test_no_email_field_the_account_email_is_used(client, db, student):
     html = client.get("/report/").get_data(as_text=True)
-    assert 'name="email"' in html and 'type="email"' in html and "required" in html
+    assert 'name="email"' not in html and "ana.popescu@student.upt.ro" in html
+    client.post("/report/", data=_report(student, email="someone.else@x.ro"))  # ignored
+    (absence,) = _absences(db)
+    assert absence.email == "ana.popescu@student.upt.ro"
 
 
-@pytest.mark.parametrize("override", [
-    {"reason": ""}, {"start_date": ""}, {"start_date": "x"},
-    {"email": ""}, {"email": "not-an-email"}, {"email": "a b@c.ro"}, {"email": "x" * 251 + "@a.ro"},
-])
+def test_report_needs_a_student_login(app, team):
+    anon = app.test_client()
+    res = anon.get("/report/")
+    assert res.status_code == 302 and "/login?next=%2Freport%2F" in res.headers["Location"]
+    assert anon.post("/report/", data=_report(team.members[0])).status_code == 302
+    assert anon.get("/report/thanks").status_code == 302
+    assert _absences(_db) == []
+
+
+def test_staff_cannot_report(app, team, admin, assistant):
+    for user in (admin, assistant):
+        staff = app.test_client()
+        login(staff, user.email)
+        assert staff.get("/report/").status_code == 403
+        assert staff.post("/report/", data=_report(team.members[0])).status_code == 403
+    assert _absences(_db) == []
+
+
+def test_login_returns_to_the_report_form(app, student_account):
+    anon = app.test_client()
+    res = login(anon, student_account.email, next="/report/")
+    assert res.headers["Location"].endswith("/report/")
+
+
+@pytest.mark.parametrize("override", [{"reason": ""}, {"start_date": ""}, {"start_date": "x"}])
 def test_validation(client, db, student, override):
     res = client.post("/report/", data=_report(student, **override))
     assert res.status_code == 200
@@ -222,19 +262,26 @@ def csrf_client():
     with app.app_context():
         a = User(email="a@example.com", name="A", role=ROLE_ASSISTANT)
         a.set_password("pw")
+        s = User(email="s@example.com", name="S", role=ROLE_STUDENT)
+        s.set_password("pw")
         _db.create_all()
-        _db.session.add(Team(assistant=a, slot="TUE_18_20", members=[Student(name="A B")]))
+        _db.session.add_all([s, Team(assistant=a, slot="TUE_18_20", members=[Student(name="A B")])])
         _db.session.commit()
-        yield app.test_client()
+        c = app.test_client()
+        page = c.get("/login").get_data(as_text=True)
+        c.post("/login", data={"email": s.email, "password": "pw", "csrf_token": _token(page)})
+        yield c
         _db.session.remove()
         _db.drop_all()
 
 
+def _token(page):
+    return page.split('name="csrf_token" type="hidden" value="')[1].split('"')[0]
+
+
 def test_report_requires_csrf_token(csrf_client):
-    data = {"student_id": 1, "start_date": TUESDAY.isoformat(), "reason": "x",
-            "email": "a@b.ro"}
+    data = {"student_id": 1, "start_date": TUESDAY.isoformat(), "reason": "x"}
     assert csrf_client.post("/report/", data=data).status_code == 400
 
-    page = csrf_client.get("/report/").get_data(as_text=True)
-    token = page.split('name="csrf_token" type="hidden" value="')[1].split('"')[0]
+    token = _token(csrf_client.get("/report/").get_data(as_text=True))
     assert csrf_client.post("/report/", data={**data, "csrf_token": token}).status_code == 302

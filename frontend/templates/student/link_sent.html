@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Check your email · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="alert alert-success" role="status">
+      <h1 class="h4 alert-heading"><i class="bi bi-envelope-check" aria-hidden="true"></i> Check your email</h1>
+      <p class="mb-0">If <strong>{{ email }}</strong> can have a student account, we sent it a link. Open it within
+        24 hours to choose your password.</p>
+    </div>
+    <p class="text-body-secondary small">No email after a few minutes? Check the spam folder, or
+      <a href="{{ url_for('student.signup') }}">ask for a new link</a>.</p>
+  </div>
+</div>
+{% endblock %}

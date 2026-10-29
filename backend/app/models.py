@@ -8,6 +8,9 @@ from .extensions import db
 
 ROLE_ADMIN = "admin"
 ROLE_ASSISTANT = "assistant"
+# Students log in to see their own absences (decided 2026-10-29). Admin is an auxiliary role.
+ROLE_STUDENT = "student"
+STAFF_ROLES = (ROLE_ADMIN, ROLE_ASSISTANT)
 
 # Slot code → (label, Python weekday where Monday = 0).
 SLOTS = {
@@ -44,11 +47,17 @@ def _now():
 
 
 class User(UserMixin, db.Model):
-    """A logged-in user: the professor (admin) or a lab assistant (WAD "seller")."""
+    """A logged-in user: the professor (admin), a lab assistant (WAD "seller") or a student.
+
+    A student account isn't linked to a `Student` row: it sees the absences reported with its
+    email. It's only created from an emailed link, so the email is always the student's own.
+    """
 
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint(f"role IN ('{ROLE_ADMIN}', '{ROLE_ASSISTANT}')", name="ck_users_role"),
+        CheckConstraint(
+            f"role IN ('{ROLE_ADMIN}', '{ROLE_ASSISTANT}', '{ROLE_STUDENT}')", name="ck_users_role"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -73,6 +82,14 @@ class User(UserMixin, db.Model):
     @property
     def is_admin(self):
         return self.role == ROLE_ADMIN
+
+    @property
+    def is_staff(self):
+        return self.role in STAFF_ROLES
+
+    @property
+    def is_student(self):
+        return self.role == ROLE_STUDENT
 
 
 def _slot_check(name):

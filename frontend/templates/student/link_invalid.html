@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Link not valid · Lab Absence Manager{% endblock %}
+
+{% block content %}
+<div class="empty-state">
+  <i class="bi bi-link-45deg" aria-hidden="true"></i>
+  <h1 class="h4">This link can't be used</h1>
+  <p>{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('student.signup') }}">Get a new link</a>
+</div>
+{% endblock %}

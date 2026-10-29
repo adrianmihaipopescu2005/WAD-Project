@@ -29,7 +29,7 @@ def test_password_is_hashed(assistant):
 
 def test_invalid_role_rejected(db):
     _add_and_expect_integrity_error(
-        db, User(email="x@example.com", name="x", password_hash="h", role="student")
+        db, User(email="x@example.com", name="x", password_hash="h", role="professor")
     )
 
 
