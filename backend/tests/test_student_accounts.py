@@ -273,3 +273,161 @@ def test_upgrade_db_allows_students_and_keeps_data(tmp_path):
         con.execute("DELETE FROM users WHERE id = 1")
     con.close()
 
+
+
+# --- edit / delete own pending absences ------------------------------------------------
+
+NEXT_TUESDAY = TUESDAY + timedelta(weeks=1)
+
+
+@pytest.fixture
+def mine(assistant):
+    return _absence(add_student(assistant), "ana@student.ro")
+
+
+def _edit(client, absence, **data):
+    data = {"start_date": NEXT_TUESDAY.isoformat(), "reason": "Changed reason", **data}
+    return client.post(f"/my/absences/{absence.id}/edit", data=data)
+
+
+def _fresh(absence_id):
+    _db.session.expire_all()
+    return _db.session.scalar(_db.select(Absence).where(Absence.id == absence_id))
+
+
+def test_pending_absence_shows_edit_and_delete(as_student, mine):
+    html = as_student.get("/my/absences").get_data(as_text=True)
+    assert f'href="/my/absences/{mine.id}/edit"' in html
+    assert f'action="/my/absences/{mine.id}/delete"' in html
+
+
+def test_edit_date_and_reason(as_student, mine):
+    page = as_student.get(f"/my/absences/{mine.id}/edit").get_data(as_text=True)
+    assert "Doctor" in page and TUESDAY.isoformat() in page
+    res = _edit(as_student, mine)
+    assert res.status_code == 302 and res.headers["Location"].endswith("/my/absences")
+    a = _fresh(mine.id)
+    assert (a.start_date, a.reason, a.decision) == (NEXT_TUESDAY, "Changed reason", "pending")
+
+
+@pytest.mark.parametrize(("day", "message"), [
+    ("2026-10-29", "is not a Tuesday"),     # Thursday: not the team's day
+    ("2026-10-20", "Too late"),             # past
+    ("2027-05-04", "Pick a date until"),    # too far ahead
+])
+def test_edit_validates_the_date(as_student, mine, day, message):
+    res = _edit(as_student, mine, start_date=day)
+    assert res.status_code == 200 and message in res.get_data(as_text=True)
+    assert _fresh(mine.id).start_date == TUESDAY
+
+
+def test_edit_rejects_overlap_with_another_own_absence(as_student, mine):
+    _absence(mine.student, "ana@student.ro", start=NEXT_TUESDAY)
+    res = _edit(as_student, mine)
+    assert "already reported" in res.get_data(as_text=True)
+    assert _fresh(mine.id).start_date == TUESDAY
+
+
+def test_edit_keeping_the_same_date_is_fine(as_student, mine):
+    assert _edit(as_student, mine, start_date=TUESDAY.isoformat()).status_code == 302
+    assert _fresh(mine.id).reason == "Changed reason"
+
+
+def test_delete_removes_the_absence(as_student, mine):
+    absence_id = mine.id
+    res = as_student.post(f"/my/absences/{absence_id}/delete")
+    assert res.status_code == 302
+    assert _fresh(absence_id) is None
+    assert "deleted" in as_student.get("/my/absences").get_data(as_text=True)
+
+
+@pytest.mark.parametrize("change", [
+    {"decision": "motivated"}, {"decision": "not_motivated"}, {"status": "revoked"},
+])
+def test_decided_or_revoked_absence_is_locked(as_student, mine, change):
+    for field, value in change.items():
+        setattr(mine, field, value)
+    _db.session.commit()
+    html = as_student.get("/my/absences").get_data(as_text=True)
+    assert "Locked" in html and f"/my/absences/{mine.id}/edit" not in html
+
+    assert as_student.get(f"/my/absences/{mine.id}/edit").status_code == 302
+    _edit(as_student, mine)
+    as_student.post(f"/my/absences/{mine.id}/delete")
+    a = _fresh(mine.id)
+    assert a is not None and a.start_date == TUESDAY and a.reason == "Doctor"
+
+
+def test_locked_after_the_reporting_deadline(as_student, mine, monkeypatch):
+    from datetime import date
+
+    from app import clock
+    monkeypatch.setattr(clock, "today", lambda: date(2026, 10, 27))  # the session day itself
+    _edit(as_student, mine)
+    as_student.post(f"/my/absences/{mine.id}/delete")
+    assert _fresh(mine.id).reason == "Doctor"
+
+
+def test_cannot_touch_someone_elses_absence(as_student, assistant):
+    other = _absence(add_student(assistant, "Ion Ionescu"), "ion@student.ro")
+    assert as_student.get(f"/my/absences/{other.id}/edit").status_code == 404
+    assert _edit(as_student, other).status_code == 404
+    assert as_student.post(f"/my/absences/{other.id}/delete").status_code == 404
+    assert _fresh(other.id).reason == "Doctor"
+
+
+def test_staff_cannot_use_student_edit_routes(client, assistant, mine):
+    login(client, assistant.email)
+    assert _edit(client, mine).status_code == 403
+    assert client.post(f"/my/absences/{mine.id}/delete").status_code == 403
+
+
+def test_decision_made_meanwhile_wins(as_student, mine, monkeypatch):
+    """Staff decide between the page check and the write: the student's change is refused."""
+    real = student_accounts.can_change
+
+    def decided_meanwhile(absence):
+        ok = real(absence)
+        _db.session.execute(_db.update(Absence).where(Absence.id == absence.id)
+                            .values(decision="motivated"))
+        _db.session.commit()  # saved by the assistant's request
+        return ok
+
+    monkeypatch.setattr(student_accounts, "can_change", decided_meanwhile)
+    with pytest.raises(student_accounts.AbsenceError):
+        student_accounts.update_own_absence(mine, NEXT_TUESDAY, "Sneaky")
+    monkeypatch.setattr(student_accounts, "can_change", real)
+    a = _fresh(mine.id)
+    assert a.decision == "motivated" and a.reason == "Doctor"
+
+
+def test_delete_needs_csrf(student_account):
+    from app.config import TestingConfig as Base
+
+    class Csrf(Base):
+        WTF_CSRF_ENABLED = True
+
+    app = create_app(Csrf)
+    with app.app_context():
+        _db.create_all()
+        s = User(email="s@x.ro", name="S", role=ROLE_STUDENT)
+        s.set_password("pw")
+        _db.session.add(s)
+        team = add_team(_make_assistant(), "Ana Pop")
+        a = _absence(team.members[0], "s@x.ro")
+        c = app.test_client()
+        page = c.get("/login").get_data(as_text=True)
+        token = page.split('name="csrf_token" type="hidden" value="')[1].split('"')[0]
+        c.post("/login", data={"email": "s@x.ro", "password": "pw", "csrf_token": token})
+        assert c.post(f"/my/absences/{a.id}/delete").status_code == 400
+        assert _fresh(a.id) is not None
+        _db.session.remove()
+        _db.drop_all()
+
+
+def _make_assistant():
+    u = User(email="as@x.ro", name="As", role="assistant")
+    u.set_password("pw")
+    _db.session.add(u)
+    _db.session.commit()
+    return u

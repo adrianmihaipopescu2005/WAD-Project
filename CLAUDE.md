@@ -20,7 +20,8 @@ The milestone plan and log are in `MILESTONES.md`. The current state (done / nex
 - `absences.decision` is `pending`, `motivated` or `not_motivated`, set by staff after checking the reason. Only an active, motivated absence excuses a student (validation API).
 - `absences.email` (the student's) is required. Every decision emails the student (`services/mail.py`, SMTP via `MAIL_*` env vars); a failed email never undoes the decision.
 - `absences.sessions_count >= 1`. "Extend" increases it, so the absence covers the next weekly sessions of the same slot.
-- `absences.status` is `active` or `revoked`. "Revoke" sets `revoked` and is never a hard delete.
+- `absences.status` is `active` or `revoked`. "Revoke" (staff) sets `revoked` and is never a hard delete.
+- A student may edit (date, reason) or delete (a real delete) their **own** absence only while it is active, `pending`, and its first session is still before the reporting deadline. Once staff decide, it is locked. The check is part of the UPDATE/DELETE itself, so a decision saved meanwhile wins.
 - A student account sees **only** the absences reported with its email (`absences.email`), read-only. It is created only from a set-password link emailed to that address, so the email is the student's own. Students can't reach any staff page or the validation API.
 - Every role check is enforced server-side, not just hidden in the UI.
 

@@ -19,11 +19,19 @@ Each finished milestone gets a dated entry under **Log** and its own git commit.
 - [x] **M9: Teams, deadline and "motivated" (2026-10-28).** Students pick their team and name instead of a student number, report by the day before, and staff tick "motivated".
 - [x] **M10: Decision emails (2026-10-28).** Required student email; pending / motivated / not motivated; each decision emails the student.
 - [x] **M11: Student accounts (2026-10-29).** Students sign up by emailed link and see the status of their own absences.
+- [x] **M12: Students edit / delete pending absences (2026-10-29).**
 
 ## Open questions
 - None right now. (M6 routing and lookup privacy were decided on 2026-10-26. See the shared ADRs.)
 
 ## Log
+### M12: Students edit / delete pending absences (2026-10-29)
+- User decision: a student can edit an absence while it's pending, or delete it as a whole.
+- Rules chosen (stated to the user): only their own absences, only while active + `pending` + the first session still before the reporting deadline; decided/revoked ones show "Locked". Edit changes the date (team slot, same window and weekday checks, no overlap with their other absences; `overlaps_active(..., exclude_id)`) and the reason. Delete is a real delete; staff revoke still isn't.
+- `services/student_accounts.py`: `get_own_absence` (404 for others), `can_change`, `update_own_absence`, `delete_own_absence`. The write is a conditional `UPDATE`/`DELETE ... WHERE decision = 'pending' AND status = 'active' AND start_date >= tomorrow`, so a decision saved meanwhile wins (tested).
+- `/my/absences/<id>/edit` (GET/POST) and `/my/absences/<id>/delete` (POST, CSRF, Bootstrap confirmation modal). Actions column on "My absences".
+- Tests: 16 new (**304 passed**), ruff clean. Checked on a running dev server over HTTP: edit, wrong-weekday error, delete, "Locked" on a motivated absence.
+
 ### M11: Student accounts (2026-10-29)
 - User decisions: students can make an account and see the status of all their absences (pending / motivated / not motivated); the decision emails stay. This replaces "two logged-in roles only". Admin is an auxiliary role (WAD roles: assistant = seller, student = customer).
 - Defaults chosen (not asked): the account sees the absences reported **with its email**, only its own, read-only.

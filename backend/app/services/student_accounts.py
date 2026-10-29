@@ -11,8 +11,9 @@ from flask import current_app, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from ..extensions import db
-from ..models import DECISIONS, ROLE_STUDENT, STATUS_ACTIVE, Absence, User
+from ..models import DECISION_PENDING, DECISIONS, ROLE_STUDENT, STATUS_ACTIVE, Absence, User
 from . import commit_or_rollback, mail
+from .absences import AbsenceError, date_window, overlaps_active, slot_date_error
 from .auth import normalize_email
 
 LINK_MAX_AGE_SECONDS = 24 * 60 * 60
@@ -114,3 +115,77 @@ def decision_counts(user):
         .group_by(Absence.decision)
     ).all()
     return {d: 0 for d in DECISIONS} | dict(rows)
+
+
+# --- a student's own absences: edit / delete while pending (decided 2026-10-29) --------
+
+LOCKED_MESSAGE = (
+    "This absence can't be changed any more: it was already decided, revoked, or its "
+    "reporting deadline has passed."
+)
+
+
+def get_own_absence(user, absence_id):
+    """The absence if it was reported with this student's email, else None (→ 404)."""
+    return db.session.execute(
+        db.select(Absence).where(Absence.id == absence_id, Absence.email == user.email)
+    ).scalar_one_or_none()
+
+
+def can_change(absence):
+    """A student may edit or delete an absence that is active, still pending, and whose
+    first session can still be reported (by 23:59 the day before)."""
+    return (
+        absence.status == STATUS_ACTIVE
+        and absence.decision == DECISION_PENDING
+        and absence.start_date >= date_window()[0]
+    )
+
+
+def _still_changeable(absence):
+    """SQL conditions matching can_change(), so a decision saved meanwhile wins the race."""
+    return (
+        Absence.id == absence.id,
+        Absence.status == STATUS_ACTIVE,
+        Absence.decision == DECISION_PENDING,
+        Absence.start_date >= date_window()[0],
+    )
+
+
+def update_own_absence(absence, start_date, reason):
+    """Move the absence to another session of the team's slot and/or change the reason."""
+    if not can_change(absence):
+        raise AbsenceError(LOCKED_MESSAGE)
+    error = slot_date_error(absence.slot, start_date)
+    if error:
+        raise AbsenceError(error, 400)
+    reason = (reason or "").strip()
+    if not reason:
+        raise AbsenceError("A reason is required.", 400)
+    if overlaps_active(absence.student, absence.slot, start_date, absence.sessions_count,
+                        exclude_id=absence.id):
+        raise AbsenceError("You already reported an absence for that session.")
+
+    result = db.session.execute(
+        db.update(Absence).where(*_still_changeable(absence))
+        .values(start_date=start_date, reason=reason)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.session.rollback()
+        raise AbsenceError(LOCKED_MESSAGE)
+    commit_or_rollback()
+    db.session.refresh(absence)
+    return absence
+
+
+def delete_own_absence(absence):
+    """Delete the whole absence (a real delete: the student withdraws the report)."""
+    result = db.session.execute(
+        db.delete(Absence).where(*_still_changeable(absence))
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.session.rollback()
+        raise AbsenceError(LOCKED_MESSAGE)
+    commit_or_rollback()

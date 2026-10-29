@@ -174,12 +174,17 @@ def public_teams():
     return [t for t in db.session.execute(stmt).scalars() if t.members]
 
 
-def _overlaps_active(student, slot, start_date, sessions_count):
-    """True if any session in the new range is already covered by an active absence."""
+def overlaps_active(student, slot, start_date, sessions_count, exclude_id=None):
+    """True if any session in the new range is already covered by an active absence.
+
+    `exclude_id`: the absence being edited, which doesn't overlap itself.
+    """
     days = [start_date + timedelta(weeks=i) for i in range(sessions_count)]
     stmt = db.select(Absence).where(
         Absence.student_id == student.id, Absence.slot == slot, Absence.status == STATUS_ACTIVE
     )
+    if exclude_id is not None:
+        stmt = stmt.where(Absence.id != exclude_id)
     return any(a.covers(day) for a in db.session.execute(stmt).scalars() for day in days)
 
 
@@ -198,7 +203,7 @@ def submit_public(student_id, start_date, reason, email):
     email = (email or "").strip().lower()
     if not email:
         raise AbsenceError("An email address is required.", 400)
-    if _overlaps_active(student, slot, start_date, 1):
+    if overlaps_active(student, slot, start_date, 1):
         raise AbsenceError(DUPLICATE_PUBLIC_MESSAGE)
 
     absence = Absence(

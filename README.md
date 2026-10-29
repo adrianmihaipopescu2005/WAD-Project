@@ -90,7 +90,7 @@ Without `MAIL_USERNAME`, decisions are still saved, but no email is sent and sta
 |----------|----------|
 | System admin | **Admin** = the professor. Adds and removes lab assistants, sees everything. |
 | Seller | **Lab assistant**. Sees and changes only their own teams, their students and those students' absences. |
-| Customer | **Student**. Belongs to a team (2 students, fixed slot) of one assistant. Can sign up (`/signup`) to see the status of their absences on `/my/absences`. |
+| Customer | **Student**. Belongs to a team (2 students, fixed slot) of one assistant. Can sign up (`/signup`) to see the status of their absences on `/my/absences`, and edit or delete them while they're pending. |
 | License | **Absence**: student, slot, first missed date, number of weekly sessions, reason, the student's email, decision (pending / motivated / not motivated), status. |
 | Login page | `/login` |
 | Add / edit / delete customer, customer profile | Teams: `/teams/new`, `/teams/<id>/edit` (delete there too). Student profile: `/students/<id>` |
@@ -167,7 +167,7 @@ cd backend
 .\.venv\Scripts\python -m ruff check .
 ```
 
-There are 288 tests: models, auth, admin, teams (and the import), absences, the public form and
+There are 304 tests: models, auth, admin, teams (and the import), absences, the public form and
 its deadline, the API, the demo data and the hardening fixes.
 
 ## Project layout

@@ -3,7 +3,7 @@
 Updated: 2026-10-29. The full plan and the per-milestone log are in `MILESTONES.md`.
 
 ## Current milestone
-**M11: Student accounts + login first.** Committed and pushed, not deployed yet (needs `flask --app app upgrade-db`). M10 is pushed but not deployed; M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
+**M12: Students edit / delete pending absences.** Committed and pushed, not deployed yet. M11 (student accounts + login first) is pushed, not deployed yet (needs `flask --app app upgrade-db`). M10 is pushed but not deployed; M9 is deployed on PythonAnywhere (admin, Darian and 38 teams set up by the user).
 
 ## Done
 - **M0:** `CLAUDE.md`, `MILESTONES.md`, `STEP.md`, `adr/` (stack + domain mapping), 12 subagents adapted to Flask/Bootstrap, scope-guard updated, git on top of `origin/main` with the repo-local author `adrianmihaipopescu2005`.
@@ -64,6 +64,9 @@ Updated: 2026-10-29. The full plan and the per-milestone log are in `MILESTONES.
   - Students blocked from staff pages and the API (403). `flask upgrade-db` for the deployed DB.
   - Login first: `/report/` needs a student login, the email field is gone (the account email is used). Home page: "Log in to report" / "Create a student account".
   - 288 tests pass. Not tried in a browser; needs the Gmail app password to send links.
+- **M12:**
+  - Students edit (date, reason) or delete their own absence while it's pending and before the deadline; decided ones are locked. Race-safe conditional UPDATE/DELETE.
+  - 304 tests pass. Checked over HTTP, not in a real browser.
 
 ## Next
 - Try the report form, sign-up and the Motivated toggle in a real browser (M11 checked over HTTP only).

@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import EmailField, PasswordField, StringField, SubmitField
+from wtforms import DateField, EmailField, PasswordField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, EqualTo, Length, Regexp
 
 from ..admin.forms import EMAIL_PATTERN
@@ -38,3 +38,13 @@ class SetPasswordForm(FlaskForm):
         validators=[DataRequired(), EqualTo("password", message="The passwords don't match.")],
     )
     submit = SubmitField("Save password")
+
+
+class EditAbsenceForm(FlaskForm):
+    start_date = DateField("Session you'll miss", validators=[DataRequired(message="Pick a date.")])
+    reason = TextAreaField("Reason", validators=[DataRequired(), Length(max=500)])
+    submit = SubmitField("Save changes")
+
+
+class DeleteAbsenceForm(FlaskForm):
+    """Empty form, used only for its CSRF token on the delete POST."""
